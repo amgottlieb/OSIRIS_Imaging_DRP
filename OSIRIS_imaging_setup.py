@@ -1,4 +1,4 @@
-"""Test."""
+"""Contains functions used in OSIRIS_imaging_pipeline.py."""
 
 from __future__ import print_function
 from glob import glob
@@ -70,14 +70,11 @@ def parse_args():
     add('--mask', dest='maskfile', default='BPmask',
         help='Name of the input mask file.')
 
-    add('--dowcs', dest='dowcs', action='store_true',
-        help='Improve the astrometric solution.')
+    # add('--dowcs', dest='dowcs', action='store_true',
+    #     help='Improve the astrometric solution.')
 
     add('--dolog', dest='dolog', action='store_true',
         help='Create an observing log without going through the full reduction.')
-
-    add('--rawdir', dest='rawdir', default='raw/',
-        help='Directory of the raw data.')
 
     add('--dooverwrite', dest='dooverwrite', default=False,
         help='Overwrites any existing files.')

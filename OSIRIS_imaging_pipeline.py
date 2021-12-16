@@ -19,47 +19,41 @@ Pipeline requirements:
 
 Pipeline can be run from its folder and is used with the following syntax.
 
- Currently, files must be unzipped. May update in the future.
+  python OSIRIS_phot_pipeline.py
+  --workdir "C:\Users\test\data_folder"
+  --outputdir "C:\Users\test\data_folder\output"
+  object_name
+  --dobias
+  --doflat
+  --domask
+  --dooverwrite False
+  --filter g,i,z
 
- To run completely from scratch:
+If you already have master bias, flats, bpmask they must be named
+MasterBias.fits or MasterFlatSloan_g.fits or MasterBPMSloan_g.fits OR be
+specified via --bias etc below.
+To run after creating master bias+flat+mask:
 
- python OSIRIS_phot_pipeline.py
- --workdir
- "C:\Users\amy\OneDrive - University of Florida\GRBs\GRB170428A-giz"
- --outputdir
- "C:\Users\amy\OneDrive - University of Florida\GRBs\GRB170428A-giz\output"
- GRB170428A-giz
- --dobias
- --doflat
- --domask
- --dowcs
- --dooverwrite False
- --filter g,i,z
-
-  If you already have master bias, flats, bpmask they must be named
- MasterBias.fits or MasterFlatSloan_g.fits or BPMaskSloan_G.fits
- To run after creating master bias+flat+mask:
-
- python OSIRIS_phot_pipeline.py
- --workdir
- "C:\Users\amy\OneDrive - University of Florida\GRBs\GRB170428A-giz"
- --outputdir
- "C:\Users\amy\OneDrive - University of Florida\GRBs\GRB170428A-giz\output"
- GRB170428A-giz
- --dowcs
- --dooverwrite False
- --filter g,i,z
+  python OSIRIS_phot_pipeline.py
+  --workdir "C:\Users\test\data_folder"
+  --outputdir "C:\Users\test\data_folder\output"
+  object_name
+  --bias MasterBias
+  --flat MasterFlat
+  --mask MasterBPM
+  --dooverwrite False
+  --filter g,i,z
 
 Things to update in the future:
+     add check on astrometry
      write out sky image
      write out cosmic ray image
      handle .gz files
      write out log
      create configuration file for parameters that can be changed
-         or just make note of them up here?
-     save figures?
+         or just make note of them up here
+     save diagnostic figures
      do something else if no gaia stars are found
-     include update_header script?
 """
 
 __author__ = "A. Gottlieb"
@@ -82,44 +76,37 @@ from astropy.wcs import wcs
 from astroquery.ipac.irsa import Irsa
 from photutils import DAOStarFinder
 from photutils.background import MeanBackground
-from matplotlib import pyplot as plt
 from astroscrappy import detect_cosmics
 
 # # Local dependencies
-import gtcsetup_phot as gtcsetup
+import OSIRIS_imaging_setup as gtcsetup
 
 
 def main(argv):
     r"""Pipeline can be run from its folder and is used with the following syntax.
 
-    Currently, files must be unzipped. May update in the future.
-
-    To run completely from scratch:
-
     python OSIRIS_phot_pipeline.py
-    --workdir
-    "C:\Users\amy\OneDrive - University of Florida\GRBs\GRB170428A-giz"
-    --outputdir
-    "C:\Users\amy\OneDrive - University of Florida\GRBs\GRB170428A-giz\output"
-    GRB170428A-giz
+    --workdir "C:\Users\test\data_folder"
+    --outputdir "C:\Users\test\data_folder\output"
+    object_name
     --dobias
     --doflat
     --domask
-    --dowcs
     --dooverwrite False
     --filter g,i,z
 
-     If you already have master bias, flats, bpmask they must be named
-    MasterBias.fits or MasterFlatSloan_g.fits or BPMaskSloan_G.fits
+    If you already have master bias, flats, bpmask they must be named
+    MasterBias.fits or MasterFlatSloan_g.fits or MasterBPMSloan_g.fits OR be 
+    specified via --bias etc below.
     To run after creating master bias+flat+mask:
 
     python OSIRIS_phot_pipeline.py
-    --workdir
-    "C:\Users\amy\OneDrive - University of Florida\GRBs\GRB170428A-giz"
-    --outputdir
-    "C:\Users\amy\OneDrive - University of Florida\GRBs\GRB170428A-giz\output"
-    GRB170428A-giz
-    --dowcs
+    --workdir "C:\Users\test\data_folder"
+    --outputdir "C:\Users\test\data_folder\output"
+    object_name
+    --bias MasterBias
+    --flat MasterFlat
+    --mask MasterBPM
     --dooverwrite False
     --filter g,i,z
     """
@@ -192,7 +179,7 @@ def main(argv):
                                                   gain, rdnoise, args.outputdir,
                                                   args.biasfile, '')
     else:
-        # Just noting file must be named MasterBias.fits
+        # Just noting file must be named MasterBias
         print('    Reading in bias', args.outputdir+args.biasfile+'.fits')
         mbias = [CCDData.read(args.outputdir+args.biasfile+'.fits',
                               hdu=x+1, unit=u.electron) for x in range(nccd)]
@@ -244,9 +231,9 @@ def main(argv):
             for x in mask_ccd:
                 mask_hdu.append(fits.ImageHDU(x.data))
             # Bad pixels have value of 1, good pixels have a value of 0
-            mask_hdu.writeto(args.outputdir+'BPmask'+filt+'.fits', overwrite=True)
+            mask_hdu.writeto(args.outputdir+'MasterBPM'+filt+'.fits', overwrite=True)
         else:
-            # Again noting the file must be called BPMaskSloan_g.fits etc
+            # Again noting the file must be called MasterBPMSloan_g.fits etc
             bpmask_name = args.outputdir+args.maskfile+filt+'.fits'
             print('    Reading in bad pixel mask', bpmask_name)
             mask_ccd = [CCDData.read(bpmask_name,
@@ -324,7 +311,8 @@ def main(argv):
 
                         test_mask, _clean = detect_cosmics(np.array(
                             sci_proc_init[x].data),
-                            inmask=None,  # np.array(mask_ccd[x].data), or None; bpm
+                            # np.array(mask_ccd[x].data), or None; bpm
+                            inmask=np.array(mask_ccd[x].data),
                             sigclip=4.5,  # lower values flag more pixels as cosmic rays
                             sigfrac=0.3,
                             objlim=10.0,  # increase if centers of stars flagged as cosmic rays
@@ -444,7 +432,7 @@ def main(argv):
     # print(bcolors.OKBLUE +
     #       '\nTotal execution time {0:.1f} min'.format(((time()-tstart) / 60)) +
     #       bcolors.ENDC)
-    sys.exit('*** Done ***')
+    print('*** Done ***')
 
 
 if __name__ == "__main__":
