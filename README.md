@@ -21,3 +21,14 @@ python OSIRIS_phot_pipeline.py --workdir  "C:\Users\test\datafolder" --outputdir
 Or if files already exist:
 
 python OSIRIS_phot_pipeline.py --workdir "C:\Users\test\data_folder" --outputdir "C:\Users\test\data_folder\output" object_name --bias MasterBias --flat MasterFlat --mask MasterBPM --dooverwrite False --filter g,i,z
+
+
+Output files are:
+
+    MasterBias.fits
+    MasterFlatSloan_g.fits (and other filters)
+    MasterBPMSloan_g.fits (and other filters)
+    original files split into ccd1 and ccd2
+    final images combined by filter split into ccd1 and ccd2 for both the target and standard star:
+        objname_OSIRIS_filter_final_ccd1.fits and objname_OSIRIS_filter_final_ccd2.fits
+        Standard_Star_OSIRIS_filter_final_ccd1.fits and Standard_Star_OSIRIS_filter_final_ccd2.fits
