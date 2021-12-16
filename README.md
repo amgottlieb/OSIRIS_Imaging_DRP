@@ -14,13 +14,14 @@ Pipeline requirements:
     *local file- OSIRIS_imaging_gtcsetup.py
 
 
-Pipeline can be run from its folder and is used with the following syntax.
+The ipeline can be run from its folder and is used with the following syntax.
 
-python OSIRIS_phot_pipeline.py --workdir  "C:\Users\test\datafolder" --outputdir "C:\Users\test\datafolder\output" object_name --dobias --doflat --domask --dowcs --dooverwrite False --filter g,i,z
+python OSIRIS_phot_pipeline.py --workdir  "C:\Users\path\to\GRB170428A-giz" --outputdir "C:\Users\test\path\to\GRB170428A-giz\output" GRB170428A-giz --dobias --doflat --domask  --dowcs --dooverwrite False --filter g,i,z
 
-Or if files already exist:
+where GRB170428A-giz is the name of the object in the header.
+Or if the master bias, flat, and bad pixel mask files already exist:
 
-python OSIRIS_phot_pipeline.py --workdir "C:\Users\test\data_folder" --outputdir "C:\Users\test\data_folder\output" object_name --bias MasterBias --flat MasterFlat --mask MasterBPM --dooverwrite False --filter g,i,z
+python OSIRIS_phot_pipeline.py --workdir "C:\Users\path\to\GRB170428A-giz" --outputdir "C:\Users\path\to\GRB170428A-giz\output" GRB170428A-giz --bias MasterBias --flat MasterFlat --mask MasterBPM --dooverwrite False --filter g,i,z
 
 
 Output files are:
