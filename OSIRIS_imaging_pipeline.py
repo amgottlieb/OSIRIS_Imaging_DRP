@@ -14,7 +14,7 @@ Pipeline requirements:
     scipy
     numpy
     matplotlib
-    *local file- gtcsetup_phot.py
+    *local file- OSIRIS_imaging_gtcsetup.py
 
 
 Pipeline can be run from its folder and is used with the following syntax.
@@ -79,19 +79,14 @@ from astropy.io import fits
 from astropy.modeling import models
 from astropy.coordinates import SkyCoord
 from astropy.wcs import wcs
-from ccdproc import wcs_project
 from astroquery.ipac.irsa import Irsa
-# import argparse
-# import shutil
 from photutils import DAOStarFinder
 from photutils.background import MeanBackground
 from matplotlib import pyplot as plt
 from astroscrappy import detect_cosmics
 
 # # Local dependencies
-# from misc import bcolors
 import gtcsetup_phot as gtcsetup
-# import test_update_wcs as update_wcs
 
 
 def main(argv):
@@ -131,7 +126,7 @@ def main(argv):
     tstart = time()
 
     # Instrument specific constants
-    saturation = 65535  # CHECK##############
+    saturation = 65535
     gain = 0.95
     rdnoise = 4.5  # electrons
     nccd = 2
