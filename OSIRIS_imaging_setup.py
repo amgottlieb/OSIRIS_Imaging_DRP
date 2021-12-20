@@ -21,6 +21,14 @@ from astropy.coordinates import SkyCoord
 from astropy.wcs import wcs
 
 
+def print_both(file, *args):
+    """Print statement to command line and to file."""
+    toprint = ' '.join([str(arg) for arg in args])
+    toprint += ' \n'
+    print(toprint)
+    file.write(toprint)
+
+
 def read_args():
     """Create wrapper to parse and customize command-line arguments."""
     parser = parse_args()
@@ -67,13 +75,16 @@ def parse_args():
     add('--domask', dest='domask', action='store_true',
         help='Make mask to remove bad pixels instead of reading it from input file.')
 
-    add('--mask', dest='maskfile', default='BPmask',
+    add('--mask', dest='maskfile', default='MasterBPM',
         help='Name of the input mask file.')
+
+    add('--logfile', dest='logfile', default='log.txt',
+        help='Name of the file which contains all print statements fromt the pipeline.')
 
     # add('--dowcs', dest='dowcs', action='store_true',
     #     help='Improve the astrometric solution.')
 
-    add('--dolog', dest='dolog', action='store_true',
+    add('--doobslog', dest='doobslog', action='store_true',
         help='Create an observing log without going through the full reduction.')
 
     add('--dooverwrite', dest='dooverwrite', default=False,
@@ -86,7 +97,7 @@ def setup_args(parser):
     """Any manipulation of the arguments that may be required."""
     args = parser.parse_args()
     # check for \ or / depending on windows or linux/mac
-    # print('system',sys.platform)
+    # gtcsetup.print_both(log_fname, 'system',sys.platform)
     print('    CHECKING for slashes in ', args.workdir)
     if '\\\\' in args.workdir:
         use_slash = '\\\\'
@@ -103,7 +114,8 @@ def setup_args(parser):
     return args, use_slash
 
 
-def sort_files(obj, raw_path, raw_list, use_slash, outputdir, dooverwrite):
+def sort_files(obj, raw_path, raw_list, use_slash, outputdir, dooverwrite,
+               diagnostic_dir, log_fname):
     r"""Sort/move files into different folders based on file names.
 
     Can be sorted based on header information (commented code below, may need
@@ -121,6 +133,7 @@ def sort_files(obj, raw_path, raw_list, use_slash, outputdir, dooverwrite):
                         (master files, processed data)
     dooverwrite (bool) : if True, overwrite current existing directories;
                         WILL LOSE OUTPUT FOLDER IF TRUE
+    log_fname (str) : full path to log file
 
     Returns
     -------
@@ -128,10 +141,10 @@ def sort_files(obj, raw_path, raw_list, use_slash, outputdir, dooverwrite):
     each directory; each file contains full path
     """
     # NOTE: raw_list already has file path in it
-    print('    Sorting files...')
+    print_both(log_fname, '    Sorting files...')
     # this creates the directories if they don't already exist
     bias_path, flat_path, sci_path, std_path = setup_directories(
-        raw_path, use_slash, outputdir, dooverwrite)
+        raw_path, use_slash, outputdir, diagnostic_dir, dooverwrite, log_fname)
 
     for f in raw_list:
         if 'Bias' in f:
@@ -142,7 +155,8 @@ def sort_files(obj, raw_path, raw_list, use_slash, outputdir, dooverwrite):
             with fits.open(f) as file_open:
                 hdr = file_open[0].header
                 target = hdr['OBJECT'].replace(' ', '')
-                print('        Objectid', obj, 'check against target', target)
+                print_both(log_fname, '        Objectid', obj,
+                           'check against target', target)
                 if target == obj:
                     move_path = sci_path
                 else:
@@ -161,7 +175,8 @@ def sort_files(obj, raw_path, raw_list, use_slash, outputdir, dooverwrite):
     return bias_list, flat_list, sci_list, std_list
 
 
-def setup_directories(raw_path, use_slash, outputdir, dooverwrite):
+def setup_directories(raw_path, use_slash, outputdir, diagnostic_dir,
+                      dooverwrite, log_fname):
     r"""Create necessary folders and copy all files into the copy folder.
 
     Parameters
@@ -172,6 +187,7 @@ def setup_directories(raw_path, use_slash, outputdir, dooverwrite):
                         (master files, processed data)
     dooverwrite (bool) : if True, overwrite current existing directories;
                         WILL LOSE OUTPUT FOLDER IF TRUE
+    log_fname (str) : full path to log file
 
     Returns
     -------
@@ -187,15 +203,15 @@ def setup_directories(raw_path, use_slash, outputdir, dooverwrite):
     # Copy all data to this directory in case you need to start over
     copy_path = raw_path+'copy'+use_slash
 
-    paths = [bias_path, flat_path, sci_path, std_path, outputdir]
+    paths = [bias_path, flat_path, sci_path, std_path, outputdir, diagnostic_dir]
 
-    print('        Overwriting folders?', dooverwrite)
+    print_both(log_fname, '        Overwriting folders?', dooverwrite)
 
     # if there isn't a copy directory already, make it and copy all files into it
     if not os.path.exists(copy_path):
-        print('        Creating copy directory')
+        print_both(log_fname, '        Creating copy directory')
         os.makedirs(copy_path)
-        print('        Copying all fits files into copy directory')
+        print_both(log_fname, '        Copying all fits files into copy directory')
         copy_list = [i.replace(os.sep, '/') for i in glob(raw_path+'0*.fits*')]
         for f in copy_list:
             shutil.copy2(f, copy_path)
@@ -205,24 +221,26 @@ def setup_directories(raw_path, use_slash, outputdir, dooverwrite):
     for i, path1 in enumerate(paths):
         if not os.path.exists(path1):
             os.makedirs(path1)
-            print('        Creating directory', path1)
+            print_both(log_fname, '        Creating directory', path1)
         elif dooverwrite == 'True' or dooverwrite is True:
             shutil.rmtree(path1)
             os.makedirs(path1)
-            print('        Overwriting directory', path1)
+            print_both(log_fname, '        Overwriting directory', path1)
         else:
-            print('        ', path1, ': Directory already exists; not overwriting.')
+            print_both(log_fname, '        ', path1,
+                       ': Directory already exists; not overwriting.')
 
     return bias_path, flat_path, sci_path, std_path
 
 
-def print_obslog_folder(folder, out, verbose):
+def print_obslog_folder(folder, out, verbose, log_fname):
     """Print observing log for a specific folder.
 
     Parameters
     ----------
     folder (str) : full path to folder that you want to print the observing log for
     out (str) : observing log output file
+    log_fname (str) : full path to log file
 
     Returns
     -------
@@ -243,10 +261,10 @@ def print_obslog_folder(folder, out, verbose):
                 i+1, obsid[0], filt, grism, date, airmass, expo, target)
         print(msg, file=out)
         if verbose:
-            print(msg)
+            print_both(log_fname, msg)
 
 
-def print_obslog(obj, flt, bias, flat, sci, std, verbose=True):
+def print_obslog(obj, flt, bias, flat, sci, std, log_fname, verbose=True):
     """Print header + observing logs for all folders. Does not return anything.
 
     Parameters
@@ -258,6 +276,7 @@ def print_obslog(obj, flt, bias, flat, sci, std, verbose=True):
     sci (array) : list of all files in the science directory
     std (array) : list of all files in the standard directory
     Note: all arrays above contain full path for each file
+    log_fname (str) : full path to log file
 
     Returns
     -------
@@ -273,18 +292,18 @@ def print_obslog(obj, flt, bias, flat, sci, std, verbose=True):
         'ObservationID', 'Filter', 'Grism', 'Start Time', 'Airmass', 'Exposure', 'Target')
     print(head, file=out)
     if verbose:
-        print(head)
+        print_both(log_fname, head)
 
-    print_obslog_folder(bias, out, verbose)
-    print_obslog_folder(flat, out, verbose)
-    print_obslog_folder(sci, out, verbose)
-    print_obslog_folder(std, out, verbose)
+    print_obslog_folder(bias, out, verbose, log_fname)
+    print_obslog_folder(flat, out, verbose, log_fname)
+    print_obslog_folder(sci, out, verbose, log_fname)
+    print_obslog_folder(std, out, verbose, log_fname)
 
     return
 
 
 def createMaster(full_flist, frametype, nccd, mbias, gain, rdnoise, outputdir,
-                 name, filt):
+                 name, filt, log_fname):
     """Given list of files, create Master bias or flat.
 
     Usage:
@@ -306,13 +325,14 @@ def createMaster(full_flist, frametype, nccd, mbias, gain, rdnoise, outputdir,
     name (str) : name of the output file to write to (INCLUDES FULL PATH)
     filt (str) : for example, Sloan_g; doesn't mastter for bias;
                 filters are looped over in main code
+    log_fname (str) : full path to log file
 
     Returns
     -------
     master (array) :[ccd1, ccd2] processed data
     fname (str) : file name (including full path) that master was written to
     """
-    print(full_flist)
+    print_both(log_fname, full_flist)
 
     # Get all filters present (really only used for flat)
     all_filters = get_filters_from_header(full_flist)
@@ -340,7 +360,7 @@ def createMaster(full_flist, frametype, nccd, mbias, gain, rdnoise, outputdir,
 
         # Read in raw data for both ccds
         raw = [CCDData.read(f, hdu=x+1, unit='adu') for x in range(nccd)]
-        print('Processing', frametype, f)
+        print_both(log_fname, 'Processing', frametype, f)
 
         # Process raw data for each ccd
         # notes: Nora had oscan, oscan_model, and trim set to these values;
@@ -360,7 +380,7 @@ def createMaster(full_flist, frametype, nccd, mbias, gain, rdnoise, outputdir,
         hdu.writeto('tmpfile'+str(j)+'.fits', overwrite=True)
     tmp = glob('tmpfile*fits')
 
-    print('Combining processed', frametype, ' files')
+    print_both(log_fname, 'Combining processed', frametype, ' files')
     # Note: Nora also had these values, I didn't change them
     master = [ccdproc.combine(tmp, hdu=x+1, unit=u.electron, method='median',
                               sigma_clip=True, sigma_clip_low_thresh=5,
@@ -369,7 +389,7 @@ def createMaster(full_flist, frametype, nccd, mbias, gain, rdnoise, outputdir,
 
     # Normalize the flat if creating master flat
     if frametype == 'flat':
-        print('Normalizing flat')
+        print_both(log_fname, 'Normalizing flat')
         for i, x in enumerate(master):
             master[i].data /= master[i].data.max()
 
@@ -377,7 +397,7 @@ def createMaster(full_flist, frametype, nccd, mbias, gain, rdnoise, outputdir,
     master_hdu = fits.HDUList([fits.PrimaryHDU(header=hdr)])
     for x in master:
         master_hdu.append(fits.ImageHDU(x.data, header=x.header))
-    print('Writing master ', frametype, ' to ', outputdir+fname)
+    print_both(log_fname, 'Writing master ', frametype, ' to ', outputdir+fname)
     master_hdu.writeto(outputdir+fname, overwrite=True)
 
     # Remove all temporary files
@@ -427,7 +447,7 @@ def get_filters(filt_list):
     return new_filt
 
 
-def do_astrometry(gaia, sources, wcs_ref, ima):
+def do_astrometry(gaia, sources, wcs_ref, ima, log_fname):
     """Correct the astrometry of an image.
 
     Parameters
@@ -460,15 +480,15 @@ def do_astrometry(gaia, sources, wcs_ref, ima):
                                      tolerance=5e-4, detect_divergence=True,
                                      adaptive=True, quiet=True)
     except wcs.NoConvergence as e:
-        print("Indices of diverging points: {0}"
-              .format(e.divergent))
-        print("Indices of poorly converging points: {0}"
-              .format(e.slow_conv))
-        print([i for i in range(len(gaia['ra']))
-               if i not in e.divergent and i not in e.slow_conv])
-        print(len(gaia['ra']))
-        # print("Best solution:\n{0}".format(e.best_solution))
-        # print("Achieved accuracy:\n{0}".format(e.accuracy))
+        print_both(log_fname, "Indices of diverging points: {0}"
+                   .format(e.divergent))
+        print_both(log_fname, "Indices of poorly converging points: {0}"
+                   .format(e.slow_conv))
+        print_both(log_fname, [i for i in range(len(gaia['ra']))
+                               if i not in e.divergent and i not in e.slow_conv])
+        print_both(log_fname, len(gaia['ra']))
+        # print_both(log_fname, "Best solution:\n{0}".format(e.best_solution))
+        # print_both(log_fname, "Achieved accuracy:\n{0}".format(e.accuracy))
         raise e
 
     for j in range(len(gaia['ra'])):
@@ -501,13 +521,14 @@ def do_astrometry(gaia, sources, wcs_ref, ima):
     idx, d2d, d3d = sky_img_radec.match_to_catalog_sky(sky_ref_radec)
     # Only take sources that are within a certain distance
     # in this case, the median distance;
-    cutoff = np.median(d2d.arcsec)  # TO DO: UPDATE THIS #############
+    cutoff = np.median(d2d.arcsec)*2.  # TO DO: UPDATE THIS #############
     good = np.where(d2d.arcsec < cutoff)[0]
     use_ref_radec = sky_ref_radec[idx][good]
     use_img_xy = np.array([sky_img_xy[0][good], sky_img_xy[1][good]])
 
     # plt.figure()
     # plt.hist(d2d.arcsec, bins=20)
+    # plt.axvline(cutoff, c='k')
 
     # Get the new wcs information
     # format of lists required by fit_wcs_from_points:
@@ -520,7 +541,7 @@ def do_astrometry(gaia, sources, wcs_ref, ima):
     return w, good
 
 
-def write_ccd(hdr, hdrs, sci_final, outputdir, imafile, root, filt):
+def write_ccd(hdr, hdrs, sci_final, outputdir, imafile, root, filt, log_fname):
     """Write out 2 ccds to separate files."""
     new_hdul = fits.HDUList()
     new_hdul.append(fits.ImageHDU(header=hdr))
@@ -533,9 +554,11 @@ def write_ccd(hdr, hdrs, sci_final, outputdir, imafile, root, filt):
     new_hdul.append(fits.ImageHDU(data=sci_final[1].data, header=hdrs[1]))
     new_hdul.writeto(outputdir+imafile.split('/')[-1][:-5] +
                      '_'+root+filt+'_ccd2.fits', overwrite=True)
+    print_both(log_fname, 'Writing files to', outputdir+imafile.split('/')[-1][:-5] +
+               '_'+root+filt+'_ccd2.fits')
 
 
-def combine_files(outputdir, root, filt):
+def combine_files(outputdir, root, filt, diag_path, use_slash, log_fname):
     """Median combine a list of images.
 
     Parameters
@@ -550,18 +573,25 @@ def combine_files(outputdir, root, filt):
     """
     combine_list = [outputdir+o for o in os.listdir(outputdir)
                     if o.endswith(root+filt+'_ccd1.fits')]
-    print('    combining files for ccd1:', combine_list)
+    print_both(log_fname, '    combining files for ccd1:', combine_list)
     ima = ccdproc.combine(combine_list, method='median', sigma_clip=True,
                           sigma_clip_func=np.ma.median, unit='adu')
     ima.write(outputdir+root+filt+'_final_ccd1.fits', overwrite=True)
 
+    # move files to diagnostic dir
+    for c in combine_list:
+        fname = c.split(use_slash)[-1]
+        shutil.move(c, diag_path+fname)
+
     combine_list = [outputdir+o for o in os.listdir(outputdir)
                     if o.endswith(root+filt+'_ccd2.fits')]
-    print('    combining files for ccd2', combine_list)
+    print_both(log_fname, '    combining files for ccd2', combine_list)
     ima = ccdproc.combine(combine_list, method='median', sigma_clip=True,
                           sigma_clip_func=np.ma.median, unit='adu')
     ima.write(outputdir+root+filt+'_final_ccd2.fits', overwrite=True)
-
+    for c in combine_list:
+        fname = c.split(use_slash)[-1]
+        shutil.move(c, diag_path+fname)
 
 #############################################################################
 
@@ -631,7 +661,7 @@ def plot_sources(wcs_sources, wcs_gaia, ima, title, sources, gaia, good):
         ax.set_title(title)
 
 
-def plot_cr(sci, cr_mask, sci_clean, bpm_mask):
+def plot_cr(sci, cr_mask, sci_clean, bpm_mask, diag_path, imafile, root, filt, log_fname):
     """Plot cosmic ray cleaned image vs original and compare BPM to CR mask.
 
     Parameters
@@ -647,12 +677,17 @@ def plot_cr(sci, cr_mask, sci_clean, bpm_mask):
     -------
     None
     """
+    vmin = np.nanmean(sci[1].data)-np.nanstd(sci[1].data)
+    vmax = np.nanmean(sci[1].data)+np.nanstd(sci[1].data)
+
     fig, axes = plt.subplots(2, 2, figsize=(10, 10))
     axes = axes.ravel()
-    axes[0].imshow(sci[1].data, cmap='gray', interpolation='none', origin='lower')
+    axes[0].imshow(sci[1].data, cmap='gray', interpolation='none', origin='lower',
+                   vmin=vmin, vmax=vmax)
     axes[0].set_title("Original Image")
 
-    axes[1].imshow(sci_clean[1], cmap='gray', interpolation='none', origin='lower')
+    axes[1].imshow(sci_clean, cmap='gray', interpolation='none', origin='lower',
+                   vmin=vmin, vmax=vmax)
     axes[1].set_title("Cosmic ray cleaned image")
 
     axes[2].imshow(bpm_mask[1].data, cmap='gray',
@@ -661,3 +696,7 @@ def plot_cr(sci, cr_mask, sci_clean, bpm_mask):
 
     axes[3].imshow(cr_mask[1], cmap='gray', interpolation='none', origin='lower')
     axes[3].set_title("Cosmic ray mask")
+    print_both(log_fname, 'Writing image to ', diag_path+imafile.split('/')[-1][:-4] +
+               '_'+root+filt+'_ccd2.png')
+    plt.savefig(diag_path+imafile.split('/')[-1][:-4] +
+                '_'+root+filt+'_ccd2.png', overwrite=True)
