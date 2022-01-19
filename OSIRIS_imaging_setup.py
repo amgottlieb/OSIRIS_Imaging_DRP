@@ -24,9 +24,8 @@ from astropy.wcs import wcs
 def print_both(file, *args):
     """Print statement to command line and to file."""
     toprint = ' '.join([str(arg) for arg in args])
-    toprint += ' \n'
     print(toprint)
-    file.write(toprint)
+    file.write(toprint+' \n')
 
 
 def read_args():
@@ -202,8 +201,12 @@ def setup_directories(raw_path, use_slash, outputdir, diagnostic_dir,
     std_path = raw_path+'standard'+use_slash
     # Copy all data to this directory in case you need to start over
     copy_path = raw_path+'copy'+use_slash
+    # more diagnostic folders
+    crmask_path = diagnostic_dir+'crmask'+use_slash
+    skymap_path = diagnostic_dir+'skymap'+use_slash
 
-    paths = [bias_path, flat_path, sci_path, std_path, outputdir, diagnostic_dir]
+    paths = [bias_path, flat_path, sci_path, std_path, outputdir,
+             diagnostic_dir, crmask_path, skymap_path]
 
     print_both(log_fname, '        Overwriting folders?', dooverwrite)
 

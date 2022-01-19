@@ -14,35 +14,37 @@ Pipeline requirements:
     scipy
     numpy
     matplotlib
-    *local file- OSIRIS_imaging_gtcsetup.py
+    *local file- OSIRIS_imaging_setup.py
 
+The pipeline can be run from any folder and is used with the following syntax:
 
-Pipeline can be run from its folder and is used with the following syntax.
+python OSIRIS_phot_pipeline.py
+OBJNAME
+--workdir "C:\Users\path\to\raw_files"
+--outputdir "C:\Users\test\path\to\output"
+--dobias
+--doflat
+--domask
+--dowcs
+--dooverwrite False
+--filter g,i,z
 
-  python OSIRIS_phot_pipeline.py
-  --workdir "C:\Users\test\data_folder"
-  --outputdir "C:\Users\test\data_folder\output"
-  object_name
-  --dobias
-  --doflat
-  --domask
-  --dooverwrite False
-  --filter g,i,z
+OBJNAME is a required input and it is the name of the object that is given in
+the header under the keyword 'OBJECT'. 'workdir' is the full path to the raw
+files and 'outputdir' is the full path to where you want to store the final
+files (it does not have to be in the same folder as the raw files).
 
-If you already have master bias, flats, bpmask they must be named
-MasterBias.fits or MasterFlatSloan_g.fits or MasterBPMSloan_g.fits OR be
-specified via --bias etc below.
-To run after creating master bias+flat+mask:
+Or if the master bias, flat, and bad pixel mask files already exist:
 
-  python OSIRIS_phot_pipeline.py
-  --workdir "C:\Users\test\data_folder"
-  --outputdir "C:\Users\test\data_folder\output"
-  object_name
-  --bias MasterBias
-  --flat MasterFlat
-  --mask MasterBPM
-  --dooverwrite False
-  --filter g,i,z
+python OSIRIS_phot_pipeline.py
+OBJNAME
+--workdir "C:\Users\path\to\raw_files"
+--outputdir "C:\Users\path\to\output"
+--bias MasterBias
+--flat MasterFlat
+--mask MasterBPM
+--dooverwrite False
+--filter g,i,z
 
 Things to update in the future:
      add check on astrometry
@@ -53,12 +55,11 @@ Things to update in the future:
      do something else if no gaia stars are found
 
 NOTE: If --dooverwrite is True but you don't have --dobias --doflat and --domask,
-all files will be deleted and the program will crash
+all files will be deleted and the program will crash.
 """
 
 __author__ = "A. Gottlieb"
 __created__ = "2021-11-03"
-
 
 from time import time
 from glob import glob
@@ -76,7 +77,7 @@ from astropy.coordinates import SkyCoord
 from astropy.wcs import wcs
 from astroquery.ipac.irsa import Irsa
 from photutils import DAOStarFinder
-from photutils.background import MeanBackground
+from photutils.background import MedianBackground
 from astroscrappy import detect_cosmics
 import matplotlib.pyplot as plt
 from datetime import datetime
@@ -89,9 +90,9 @@ def main(argv):
     r"""Pipeline can be run from its folder and is used with the following syntax.
 
     python OSIRIS_phot_pipeline.py
-    --workdir "C:\Users\test\data_folder"
-    --outputdir "C:\Users\test\data_folder\output"
-    object_name
+    OBJNAME
+    --workdir "C:\Users\path\to\raw_files"
+    --outputdir "C:\Users\path\to\raw_files\output"
     --dobias
     --doflat
     --domask
@@ -104,9 +105,9 @@ def main(argv):
     To run after creating master bias+flat+mask:
 
     python OSIRIS_phot_pipeline.py
-    --workdir "C:\Users\test\data_folder"
-    --outputdir "C:\Users\test\data_folder\output"
-    object_name
+    OBJNAME
+    --workdir "C:\Users\test\raw_files"
+    --outputdir "C:\Users\test\raw_files\output"
     --bias MasterBias
     --flat MasterFlat
     --mask MasterBPM
@@ -129,14 +130,12 @@ def main(argv):
 
     now = datetime.now()  # current date and time
     date_time = now.strftime("%m-%d-%Y_%H-%M-%S")
-    new_logfile = args.outputdir+args.logfile[:-4]+date_time+'.txt'
+    new_logfile = args.workdir+args.logfile[:-4]+date_time+'.txt'
 
     log_fname = open(new_logfile, 'a')
     gtcsetup.print_both(log_fname, 'Writing output to file', new_logfile)
 
     msg = 'Step 1: Administration'
-    # gtcsetup.print_both(log_fname, bcolors.HEADER + bcolors.BOLD +
-    # '\n{}\n'.format(msg) + bcolors.ENDC)
     gtcsetup.print_both(log_fname, msg)
 
     # Get working directory
@@ -175,18 +174,14 @@ def main(argv):
     # ****NOTE: THIS CAN BE USED TO CHECK HEADER INFORMATION FOR ALL FILES****
     # I created a script called update header.py to change obstype from focus
     # to object
-    gtcsetup.print_obslog(args.objectid, args.filt, fb, ff, fsci, fstd)
+    gtcsetup.print_obslog(args.objectid, args.filt, fb, ff, fsci, fstd, log_fname)
 
-    # TO DO: include update header script?
-
-    # if dolog is true (e.g. only print the observing log), stop here
-    if args.dolog:
+    # if doobslog is true (e.g. only print the observing log), stop here
+    if args.doobslog:
         sys.exit()
 
     gtcsetup.print_both(log_fname, '--------------------------------------')
     msg = 'Step 2: Master Bias'
-    # gtcsetup.print_both(log_fname, bcolors.HEADER + bcolors.BOLD +
-    # '\n{}\n'.format(msg) + bcolors.ENDC)
     gtcsetup.print_both(log_fname, msg)
 
     gtcsetup.print_both(log_fname, '    Dobias = ', args.dobias)
@@ -210,12 +205,11 @@ def main(argv):
     gtcsetup.print_both(log_fname, '-------------------------------------------')
     gtcsetup.print_both(log_fname, 'Now looping through filters:', all_filt)
 
+    # Loop through filters
     for filt in all_filt:
         gtcsetup.print_both(log_fname, 'Running through filter', filt)
 
         msg = 'Step 3: Master Flat; filter '+filt
-        # gtcsetup.print_both(log_fname, bcolors.HEADER + bcolors.BOLD +
-        # '\n{}\n'.format(msg) + bcolors.ENDC)
         gtcsetup.print_both(log_fname, msg)
 
         gtcsetup.print_both(log_fname, '    Doflat', args.doflat)
@@ -237,8 +231,6 @@ def main(argv):
 
         gtcsetup.print_both(log_fname, '---------------------')
         msg = 'Step 4: Mask Bad Pixels; filter '+filt
-        # gtcsetup.print_both(log_fname, bcolors.HEADER + bcolors.BOLD +
-        # '\n{}\n'.format(msg) + bcolors.ENDC)
         gtcsetup.print_both(log_fname, msg)
 
         gtcsetup.print_both(log_fname, '    Domask', args.domask)
@@ -275,8 +267,7 @@ def main(argv):
             gtcsetup.print_both(log_fname, '---------------------')
             msg = 'Step 5: Science Frames; filter '+filt+'; object:'+root
             gtcsetup.print_both(log_fname, msg)
-            # gtcsetup.print_both(log_fname, bcolors.HEADER + bcolors.BOLD +
-            # '\n{}\n'.format(msg) + bcolors.ENDC)
+
             for j, f in enumerate(obj):
                 with fits.open(f) as fits_open:
                     # Note: because images have been trimmed, the wcs information is
@@ -315,7 +306,6 @@ def main(argv):
                     # I didn't change this
                     sci_proc_init = [ccdproc.ccd_process(
                         x, oscan='[3:22,:]',
-                        # x.header['BIASSEC'],
                         oscan_model=models.Chebyshev1D(3),
                         trim=x.header['TRIMSEC'],
                         master_bias=mbias[k],
@@ -328,7 +318,6 @@ def main(argv):
 
                     sci_proc_no_bpm = [ccdproc.ccd_process(
                         x, oscan='[3:22,:]',
-                        # x.header['BIASSEC'],
                         oscan_model=models.Chebyshev1D(3),
                         trim=x.header['TRIMSEC'],
                         master_bias=mbias[k],
@@ -339,12 +328,12 @@ def main(argv):
                         gain_corrected=True)
                         for k, x in enumerate(sci_raw)]
 
-                    plt.figure()
-                    plt.imshow(sci_proc_no_bpm[1].data-sci_proc_init[1].data,
-                               interpolation=None, origin='lower')
-                    gtcsetup.print_both(
-                        log_fname, ((sci_proc_no_bpm[1].data-sci_proc_init[1].data)))
-                    sys.exit()
+                    if to_plot is True:
+                        plt.figure()
+                        plt.imshow(sci_proc_no_bpm[1].data-sci_proc_init[1].data,
+                                   interpolation=None, origin='lower')
+                    # print(sci_proc_no_bpm[1].data-sci_proc_init[1].data)
+                    # sys.exit()
                     # cosmic ray cleaning must be done before sky subtraction
                     # NOTE: it's still finding saturated stars as crs
 
@@ -352,6 +341,8 @@ def main(argv):
                     cleaned_sci = []
                     cr_mask = []
                     for x in range(len(sci_proc_init)):
+                        # cr_cleaned = ccdproc.cosmicray_lacosmic(x, gain=1.0,
+                        # sig_clip=5)
 
                         test_mask, _clean = detect_cosmics(np.array(
                             sci_proc_init[x].data),
@@ -375,7 +366,8 @@ def main(argv):
 
                     if to_plot is True:
                         gtcsetup.plot_cr(sci_proc_init, cr_mask, cleaned_sci[1],
-                                         mask_ccd, diag_path, f[:-5]+'_CRmask.png',
+                                         mask_ccd, diag_path +
+                                         'crmask/', f[:-5]+'_CRmask.png',
                                          root, filt, log_fname)
 
                     # check how cosmic ray mask is affecting the image
@@ -388,20 +380,21 @@ def main(argv):
                     sci_proc[1].data = cleaned_sci[1]
 
                     # Write out cosmic ray masks to diagnostic folders
-                    gtcsetup.write_ccd(hdr, hdrs, cr_mask, diag_path,
+                    gtcsetup.write_ccd(hdr, hdrs, cr_mask, diag_path+'crmask/',
                                        f[:-5]+'_CRmask.fits', root, filt, log_fname)
 
                     # Get the mean sky of the current image; Nora set these vals
-                    mean_sky = MeanBackground(SigmaClip(sigma=3., maxiters=10))
-
-                    # Create the skymap for the current image using the mean sky?
+                    median_sky = MedianBackground(SigmaClip(sigma=3., maxiters=10))
+                    gtcsetup.print_both(log_fname, 'Median sky:', median_sky)
+                    # Create the skymap for the current image using the mean sky
+                    # will be array of all one number
                     sci_skymap = [
-                        mean_sky.calc_background(x)*np.ones(np.shape(x))*u.electron
+                        median_sky.calc_background(x)*np.ones(np.shape(x))*u.electron
                         for x in sci_proc]
 
-                    # Write out cosmic ray masks to diagnostic folders
-                    gtcsetup.write_ccd(hdr, hdrs, sci_skymap, diag_path,
-                                       f[:-5]+'_skymap.fits', root, filt, log_fname)
+                    # Write out sky map to diagnostic folders
+                    # gtcsetup.write_ccd(hdr, hdrs, sci_skymap, diag_path+'skymap/',
+                    #                    f[:-5]+'_skymap.fits', root, filt, log_fname)
 
                     # Subtract the skymap from the current image in both ccds
                     sky_sub = [x.subtract(sci_skymap[k],
@@ -417,9 +410,6 @@ def main(argv):
 
                     # if args.dowcs:
                     for n in range(len(sci_final)):
-                        # if n == 0:
-                        #     continue
-                        # gtcsetup.print_both(log_fname, '    -----------------')
                         gtcsetup.print_both(
                             log_fname, '    Working on wcs info for CCD', n)
                         ima = sci_final[n]
@@ -494,9 +484,6 @@ def main(argv):
                 log_fname, '--------------------------------------------------')
     gtcsetup.print_both(log_fname, 'Total execution time',
                         ((time()-tstart))/60., 'min')
-    # gtcsetup.print_both(log_fname, bcolors.OKBLUE +
-    #       '\nTotal execution time {0:.1f} min'.format(((time()-tstart) / 60)) +
-    #       bcolors.ENDC)
     gtcsetup.print_both(log_fname, '*** Done ***')
     log_fname.close()
 
