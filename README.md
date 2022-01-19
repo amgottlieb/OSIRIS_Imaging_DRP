@@ -14,14 +14,16 @@ Pipeline requirements:
     *local file- OSIRIS_imaging_gtcsetup.py
 
 
-The pipeline can be run from its folder and is used with the following syntax.
+The pipeline can be run from any folder and is used with the following syntax:
 
-python OSIRIS_phot_pipeline.py --workdir  "C:\Users\path\to\GRB170428A-giz" --outputdir "C:\Users\test\path\to\GRB170428A-giz\output" GRB170428A-giz --dobias --doflat --domask  --dowcs --dooverwrite False --filter g,i,z
+python OSIRIS_phot_pipeline.py OBJNAME --workdir  "C:\Users\path\to\raw_files" --outputdir "C:\Users\test\path\to\output" --dobias --doflat --domask  --dowcs --dooverwrite False --filter g,i,z
 
-where GRB170428A-giz is the name of the object in the header.
+OBJNAME is a required input and it is the name of the object that is given in the header under the keyword 'OBJECT'.
+'workdir' is the full path to the raw files and 'outputdir' is the full path to where you want to store the final files (it does not have to be in the same folder as the raw files).
+
 Or if the master bias, flat, and bad pixel mask files already exist:
 
-python OSIRIS_phot_pipeline.py --workdir "C:\Users\path\to\GRB170428A-giz" --outputdir "C:\Users\path\to\GRB170428A-giz\output" GRB170428A-giz --bias MasterBias --flat MasterFlat --mask MasterBPM --dooverwrite False --filter g,i,z
+python OSIRIS_phot_pipeline.py OBJNAME --workdir "C:\Users\path\to\raw_files" --outputdir "C:\Users\path\to\output" --bias MasterBias --flat MasterFlat --mask MasterBPM --dooverwrite False --filter g,i,z
 
 
 Output files are:
@@ -35,4 +37,3 @@ Output files are:
     folder containing diagnostic files:
         original images split into ccd1 and ccd2 for both the target and standard star
         CRmask images split into ccd1 and ccd2 for both the target and standard star
-        skymap images split into ccd1 and ccd2 for both the target and standard star
