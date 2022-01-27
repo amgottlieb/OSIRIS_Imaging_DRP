@@ -2,7 +2,7 @@
 This is a data reduction pipeline for OSIRIS imaging. It performs bias subtraction, flat division, bad pixel mask, cosmic ray cleaning, sky subtraction, astrometric correction, and stacking.
 
 Pipeline requirements:
-
+    python 3
     astropy
     astroscrappy
     astroquery
@@ -14,7 +14,7 @@ Pipeline requirements:
     *local file- OSIRIS_imaging_gtcsetup.py
 
 
-The pipeline can be run from any folder and is used with the following syntax:
+The pipeline can be run from any folder (where the gtcsetup.py is in the same folder) and is used with the following syntax:
 
 python OSIRIS_phot_pipeline.py OBJNAME --workdir  "C:\Users\path\to\raw_files" --outputdir "C:\Users\test\path\to\output" --dobias --doflat --domask  --dowcs --dooverwrite False --filter g,i,z
 
