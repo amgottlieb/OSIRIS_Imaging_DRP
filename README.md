@@ -13,10 +13,10 @@ Pipeline requirements:
     scipy
     *local file- OSIRIS_imaging_gtcsetup.py
 
-If you don't have python installed already, install it for your os with Anaconda https://www.anaconda.com/products/individual
+If you don't have python 3 installed already, install it for your os with Anaconda https://www.anaconda.com/products/individual
 
 Store the pipeline and setup file in your favorite folder and add the folder to your PATH and PYTHON_PATH environment. 
-On LINUX/mac in a terminal:
+On LINUX/MAC in a terminal:
 
     export PATH=$PATH:/new/path
     export PYTHON_PATH=$PYTHON_PATH:/new/path
@@ -25,23 +25,30 @@ Then make the file an executable:
     
     chmod u+x OSIRIS_imaging_pipeline.py
 
-On WINDOWS, follow the instructions here: https://correlated.kayako.com/article/40-running-python-scripts-from-anywhere-under-windows 
+On WINDOWS, you can either use the AnacondaPrompt3 or you can install Ubuntu from the Microsoft Store. If you use Ubuntu, follow the instructions above. If you use Anaconda prompt, follow the instructions here: https://correlated.kayako.com/article/40-running-python-scripts-from-anywhere-under-windows 
+If you are using the AnacondaPrompt3 and you get an error saying 'the following arguments are required: objectid', check for the first print statement showing the arguments that the program read in (ex: INPUT TEXT HERE). If it is an empty list, search for the Registry Editor in the Windows search bar and open it. Click the down arrow on each of the following folders: HKEY_CLASSES_ROOT, Applications, python.exe, shell, open. Then click on 'command'. In the window on the right, double click on the name (Default) , then add 
+    
+    %*"
+to the end of the text (the whole string should like like:
+    
+    "C:\Users\username\anaconda3\python.exe" "%1" %*"
+This allows Windows to pass all arguments to python.exe.
 
 Now the pipeline can be run from any folder (where the gtcsetup.py is in the same folder). 
 You can run the pipeline from any folder using the full path to the data with the following syntax:
 
-    python OSIRIS_phot_pipeline.py OBJNAME --workdir  "C:\Users\path\to\raw_files" --outputdir "C:\Users\test\path\to\output" --dobias --doflat --domask  --dowcs --dooverwrite False --filter g,i,z
+    python OSIRIS_phot_pipeline.py OBJNAME --workdir  "C:\Users\path\to\raw_files" --outputdir "C:\Users\test\path\to\output" --dobias --doflat --dobpm --docrmask --doskysub --dowcs --dointeractive --dooverwrite False --filter g,i,z
 
 OR you can move into the folder where your data is stored and then --workdir and --outputdir are not needed:
 
-    python OSIRIS_phot_pipeline.py OBJNAME --dobias --doflat --domask  --dowcs --dooverwrite False --filter g,i,z
+    python OSIRIS_phot_pipeline.py OBJNAME --dobias --doflat -dobpm --docrmask --doskysub --dowcs --dointeractive --dooverwrite False --filter g,i,z
 
 OBJNAME is a required input and it is the name of the object that is given in the header under the keyword 'OBJECT'.
 'workdir' is the full path to the raw files and 'outputdir' is the full path to where you want to store the final files (it does not have to be in the same folder as the raw files).
 
 Or if the master bias, flat, and bad pixel mask files already exist, give the names of their files with the following syntax (default file names are shown):
 
-    python OSIRIS_phot_pipeline.py OBJNAME --bias MasterBias --flat MasterFlat --mask MasterBPM --dooverwrite False --filter g,i,z
+    python OSIRIS_phot_pipeline.py OBJNAME --bias MasterBias --flat MasterFlat --bpm MasterBPM --docrmask --doskysub --dowcs --dointeractive --dooverwrite False --filter g,i,z
 
 
 The output files are:
@@ -57,9 +64,16 @@ The output files are:
         objname_OSIRIS_filter_final_ccd1.fits and objname_OSIRIS_filter_final_ccd2.fits
         Standard_Star_OSIRIS_filter_final_ccd1.fits and Standard_Star_OSIRIS_filter_final_ccd2.fits
     
-    Folder containing diagnostic files:
-        original images split into ccd1 and ccd2 for both the target and standard star
-        CRmask images split into ccd1 and ccd2 for both the target and standard star
-        images after aligning with eachother split into ccd1 and ccd2 for both the target and standard star
+    Diagnostic folder which contains the following:
+        1-calib
+            original images split into ccd1 and ccd2 for both the target and standard star
+        2-bpm
+        
+        3-crmask
+             CRmask images split into ccd1 and ccd2 for both the target and standard star
+        4-skymap
+            
+        5-astrometry
+            images after aligning with eachother split into ccd1 and ccd2 for both the target and standard star
         
 See *** for examples of a good master bias, flat, sky map, and final image.
