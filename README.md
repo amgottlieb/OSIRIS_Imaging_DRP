@@ -3,6 +3,7 @@ This is a data reduction pipeline for OSIRIS imaging. It performs bias subtracti
 
 Pipeline requirements:
     python 3
+    astroalign
     astropy
     astroscrappy
     astroquery
@@ -11,12 +12,14 @@ Pipeline requirements:
     numpy
     photutils
     scipy
+    sep
     *local file- OSIRIS_imaging_gtcsetup.py
+    *local file- OSIRIS_imaging_functions.py
 
-If you don't have python 3 installed already, install it for your os with Anaconda https://www.anaconda.com/products/individual
+If you don't have Python 3 installed already, install it for your os with Anaconda https://www.anaconda.com/products/individual
 
-Store the pipeline and setup file in your favorite folder and add the folder to your PATH and PYTHON_PATH environment. 
-On LINUX/MAC in a terminal:
+Store the pipeline and setup/functions files in your favorite folder and add the folder to your PATH and PYTHON_PATH environment. 
+To do this on LINUX/MAC in a terminal:
 
     export PATH=$PATH:/new/path
     export PYTHON_PATH=$PYTHON_PATH:/new/path
@@ -34,23 +37,30 @@ to the end of the text (the whole string should like like:
     "C:\Users\username\anaconda3\python.exe" "%1" %*"
 This allows Windows to pass all arguments to python.exe.
 
-Now the pipeline can be run from any folder (where the gtcsetup.py is in the same folder). 
+Now the pipeline can be run from any folder (where the the setup/function files are in the same folder). 
 You can run the pipeline from any folder using the full path to the data with the following syntax:
 
-    python OSIRIS_phot_pipeline.py OBJNAME --workdir  "C:\Users\path\to\raw_files" --outputdir "C:\Users\test\path\to\output" --dobias --doflat --dobpm --docrmask --doskysub --dowcs --dointeractive --dooverwrite False --filter g,i,z
+    OSIRIS_phot_pipeline.py OBJNAME --workdir  "C:\Users\path\to\raw_files" --outputdir "C:\Users\test\path\to\output" --reduce_obj 2 --dobias --doflat --dobpm --docalib --docrmask --doskysub --dostack --dowcs --dointeractive --dooverwrite False --filter r,z
 
 OR you can move into the folder where your data is stored and then --workdir and --outputdir are not needed:
 
-    python OSIRIS_phot_pipeline.py OBJNAME --dobias --doflat -dobpm --docrmask --doskysub --dowcs --dointeractive --dooverwrite False --filter g,i,z
+    OSIRIS_phot_pipeline.py OBJNAME -reduce_obj 2 --dobias --doflat --dobpm --docalib --docrmask --doskysub --dostack --dowcs --dointeractive --dooverwrite False --filter r,z
 
 OBJNAME is a required input and it is the name of the object that is given in the header under the keyword 'OBJECT'.
 'workdir' is the full path to the raw files and 'outputdir' is the full path to where you want to store the final files (it does not have to be in the same folder as the raw files).
 
 Or if the master bias, flat, and bad pixel mask files already exist, give the names of their files with the following syntax (default file names are shown):
 
-    python OSIRIS_phot_pipeline.py OBJNAME --bias MasterBias --flat MasterFlat --bpm MasterBPM --docrmask --doskysub --dowcs --dointeractive --dooverwrite False --filter g,i,z
+    OSIRIS_phot_pipeline.py OBJNAME --bias MasterBias --flat MasterFlat --bpm MasterBPM --reduce_obj 2 --docalib --docrmask --doskysub --dostacking --dowcs --dointeractive --dooverwrite False --filter r,z
 
+If they have the default file names, you can omit those parameters entirely:
+    
+    OSIRIS_phot_pipeline.py OBJNAME --reduce_obj 2 --docalib --docrmask --doskysub --dostacking --dowcs --dointeractive --dooverwrite False --filter r,z
 
+If you have already done some of the steps with the pipeline and would like to skip them, omit the '--do'. For example, if you already did calibrations and crmask (in addition to bias, flat, bpm) the call
+    
+    OSIRIS_phot_pipeline.py OBJNAME --reduce_obj 2 --doskysub --dostacking --dowcs --dointeractive --dooverwrite False --filter r,z
+    
 The output files are:
 
     Calibration files:
@@ -80,3 +90,6 @@ The output files are:
             images after aligning with eachother split into ccd1 and ccd2 for both the target and standard star
         
 See the output folder in https://drive.google.com/drive/folders/1FGA9IsR2tKaQqxZk3xpxvyofqfFDJq0f?usp=sharing for examples of a good master bias, flat, sky map, and final image as well as the raw data.
+
+Some parameters you may want to change are:
+
