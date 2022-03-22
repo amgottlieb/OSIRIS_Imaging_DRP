@@ -11,23 +11,6 @@ from astropy.nddata import CCDData
 import astropy.units as u
 import numpy as np
 from astropy.modeling import models
-import matplotlib.pyplot as plt
-from astropy.visualization import ImageNormalize
-import matplotlib.patches as patches
-# from astropy.wcs.utils import fit_wcs_from_points
-# from astropy.coordinates import SkyCoord
-# from astropy.wcs import wcs, WCS
-# import sep
-# from photutils.segmentation import make_source_mask
-# import sys
-# from astroquery.ipac.irsa import Irsa
-# from astropy import coordinates
-# from astroquery.skyview import SkyView
-# import time
-# from matplotlib.backend_bases import MouseButton
-# import matplotlib.font_manager as font_manager
-# import astroalign as aa
-# from astroscrappy import detect_cosmics
 
 
 def print_both(file, *args):
@@ -61,35 +44,37 @@ def parse_args():
 
     # optional arguments
     add('--workdir', dest='workdir', default='./',
-        help='Set the directory ')
+        help='Set the working directory. Default: ./ ')
 
     add('--outputdir', dest='outputdir', default='./output/',
-        help='Set the directory to put results in')
+        help='Set the directory to put results in. Default: ./output/')
 
     add('--filter', dest='filt', default='r',
         help='Filter of the images to be reduced. Can be multiple ex: g,i,z \
         Default: r')
 
     add('--reduce_obj', dest='reduce_obj', default=2,
-        help='Choose which object to reduce: 0 for science, 1 for standard, 2 for both')
+        help='Choose which object to reduce: 0 for science, 1 for standard, \
+            2 for both. Default: 2')
 
     add('--dobias', dest='dobias', action='store_true',
         help='Make the master bias instead of reading it from input file.')
 
     add('--bias', dest='biasfile', default='MasterBias',
-        help='Name of the input master bias file.')
+        help='Name of the input master bias file. Default: MasterBias')
 
     add('--doflat', dest='doflat', action='store_true',
         help='Make the master flat instead of reading it from input file.')
 
     add('--flat', dest='flatfile', default='MasterFlat',
-        help='Name of the input master flat file.')
+        help='Name of the input master flat file. Default: MasterFlat')
 
     add('--dobpm', dest='domask', action='store_true',
-        help='Make mask to remove bad pixels instead of reading it from input file.')
+        help='Create the master bad pixel mask instead of reading it from the \
+        input file.')
 
     add('--bpm', dest='maskfile', default='MasterBPM',
-        help='Name of the input mask file.')
+        help='Name of the input mask file.  Default: MasterBPM')
 
     add('--docalib', dest='docalib', action='store_true',
         help='Apply calibrations (bias, flat, bpm) to science images.')
@@ -98,13 +83,15 @@ def parse_args():
         help='Run cosmic ray rejection.')
 
     add('--logfile', dest='logfile', default='log.txt',
-        help='Name of the file which contains all print statements from the pipeline.')
+        help='Name of the file which contains all print statements from the \
+            pipeline.')
 
     add('--doskysub', dest='doskysub', action='store_true',
         help='Perform sky subtraction.')
 
     add('--dostack', dest='dostack', action='store_true',
-        help='Align all images with eachother and median combine them into one image.')
+        help='Align all images with eachother and median combine them into one \
+            image.')
 
     add('--dowcs', dest='dowcs', action='store_true',
         help='Improve the astrometric solution.')
@@ -116,7 +103,7 @@ def parse_args():
         help='Create an observing log without going through the full reduction.')
 
     add('--dooverwrite', dest='dooverwrite', default=False,
-        help='Overwrites any existing files.')
+        help='Overwrites any existing files. Default: False')
 
     return parser
 
@@ -126,7 +113,7 @@ def setup_args(parser):
     args = parser.parse_args()
     # check for \ or / depending on windows or linux/mac
     # gtcsetup.print_both(log_fname, 'system',sys.platform)
-    print('    CHECKING for slashes in ', args.workdir)
+    # print('    CHECKING for slashes in ', args.workdir)
     if '\\\\' in args.workdir:
         use_slash = '\\\\'
     elif '/' in args.workdir:
@@ -221,7 +208,7 @@ def rename(files, name):
     Parameters
     ----------
     files (list) : list of strings containing the full path of files
-    name (str)   : name to rename the file to (ex, 'bias') 
+    name (str)   : name to rename the file to (ex, 'bias')
 
     Returns
     -------
@@ -470,7 +457,7 @@ def createMaster(full_flist, frametype, nccd, mbias, gain, rdnoise, outputdir,
 
         # Read in raw data for both ccds
         raw = [CCDData.read(f, hdu=x+1, unit='adu') for x in range(nccd)]
-        print_both(log_fname, 'Processing', frametype, f)
+        print_both(log_fname, '     Processing', frametype, f)
 
         # Modifying the trimsec for ccd1 b/c there are 3 columns on the right
         # that are bad and they mess up the background estimation
@@ -495,7 +482,7 @@ def createMaster(full_flist, frametype, nccd, mbias, gain, rdnoise, outputdir,
         hdu.writeto('tmpfile'+str(j)+'.fits', overwrite=True)
     tmp = glob('tmpfile*fits')
 
-    print_both(log_fname, 'Combining processed', frametype, ' files')
+    print_both(log_fname, '   Combining processed', frametype, ' files')
     # Note: Nora also had these values, I didn't change them
     master = [ccdproc.combine(tmp, hdu=x+1, unit=u.electron, method='median',
                               sigma_clip=True, sigma_clip_low_thresh=5,
@@ -585,12 +572,15 @@ def write_one_image(hdr, hdrs, sci_final, outputdir, imafile, root, filt,
     -------
     None
     """
+    sig_clip_low = 5
+    sig_clip_high = 5
     # NOTE: sigma clipping is getting rid of vertical streaks in the science
     # images that are not in the master flat which is what the bad pixel mask
     # is based on
-    master = [ccdproc.combine(sci_final, hdu=x+1, unit=u.electron, method='median',
-                              sigma_clip=True, sigma_clip_low_thresh=5,
-                              sigma_clip_high_thresh=5,
+    master = [ccdproc.combine([sci_final[x]], hdu=x+1, unit=u.electron,
+                              method='median',
+                              sigma_clip=True, sigma_clip_low_thresh=sig_clip_low,
+                              sigma_clip_high_thresh=sig_clip_high,
                               sigma_clip_func=np.ma.median) for x in range(nccd)]
 
     new_hdul = fits.HDUList()
@@ -605,8 +595,9 @@ def write_one_image(hdr, hdrs, sci_final, outputdir, imafile, root, filt,
     new_hdul.writeto(outputdir+imafile.split('/')[-1][:-5] +
                      '_'+root+filt+'_ccd2.fits', overwrite=True)
 
-    print_both(log_fname, 'Writing files to', outputdir+imafile.split('/')[-1][:-5] +
-               '_'+root+filt+'_ccd2.fits')
+    print_both(log_fname, '      Writing files to',
+               outputdir+imafile.split('/')[-1][:-5] +
+               '_'+root+filt+'_ccd 1 and 2.fits')
 
 
 def write_ccd(hdr, hdrs, sci_final, outputdir, imafile, root, filt, log_fname):
@@ -639,7 +630,8 @@ def write_ccd(hdr, hdrs, sci_final, outputdir, imafile, root, filt, log_fname):
     new_hdul.append(fits.ImageHDU(data=sci_final[1].data, header=hdrs[1]))
     new_hdul.writeto(outputdir+imafile.split('/')[-1][:-5] +
                      '_'+root+filt+'_ccd2.fits', overwrite=True)
-    print_both(log_fname, 'Writing files to', outputdir+imafile.split('/')[-1][:-5] +
+    print_both(log_fname, '      Writing files to',
+               outputdir+imafile.split('/')[-1][:-5] +
                '_'+root+filt+'_ccd 1 and 2 .fits')
 
 
@@ -688,16 +680,6 @@ def combine_files(outputdir, root, filt, diag_path, use_slash, log_fname):
         shutil.move(c, diag_path+fname)
 
 
-def read_in_files(path, calib=False):
-    """Test."""
-    if os.isdir(path):
-        print(os.listdir(path))
-
-    # CCDData.read(
-    #     args.outputdir+'aligned_'+root+filt+'_ccd1.fits',
-    #     hdu=1, unit=u.electron)
-
-
 def get_header_info(obj, filt):
     """Test."""
     all_filts = []
@@ -730,120 +712,21 @@ def get_header_info(obj, filt):
     return all_headers, all_filts
 
 
-#############################################################################
+def read_in_files(path, root, log_fname):
+    """Test."""
+    all_images = []
+    if os.path.isdir(path):
+        ccd1 = [f for f in os.listdir(path) if root in f and 'ccd1' in f]
+        ccd2 = [f for f in os.listdir(path) if root in f and 'ccd2' in f]
 
+        for i in range(len(ccd1)):
+            print_both(log_fname, 'Reading in ', ccd1[i])
+            print_both(log_fname, 'Reading in ', ccd2[i])
+            img1 = CCDData.read(path+ccd1[i], hdu=1, unit=u.electron)
+            img2 = CCDData.read(path+ccd2[i], hdu=1, unit=u.electron)
+            all_images.append([img1, img2])
 
-def plot_sources(wcs_sources, wcs_gaia, ima, title, sources, gaia, good,
-                 diag_path, fname):
-    """Plot circles around detected sources in image and gaia sources.
-
-    Parameters
-    ----------
-    wcs_sources (?) : wcs projection information/object for original image
-    wcs_gaia (?) : wcs projection information/object for gaia sources?
-        Note: wcs gaia is actually the same
-    ima (array) : image data to plot
-    title (str) : title for the plot
-    sources (array) : table containing x and y positions of detected stars in ima
-    gaia (array) : table containing ra and dec of stars in gaia catalog
-    good (array) : indices for 'sources' that were matched with the gaia catalog
-    diag_path (str) :
-
-    Returns
-    -------
-    None
-    """
-    fig, ax = plt.subplots(figsize=(6, 6))
-    ax = plt.subplot(projection=wcs_sources)
-    ax.imshow(ima, cmap='gray', norm=ImageNormalize(ima, vmin=0,
-                                                    vmax=5, clip=True))
-
-    all_c = []
-    all_label = []
-    for j in range(len(gaia)):
-        # Convert gaia ra/dec to pixel space using wcs_gaia projection
-        x, y = (wcs_gaia.all_world2pix(gaia['ra'][j], gaia['dec'][j], 1,
-                                       maxiter=100, tolerance=5e-4, quiet=True,
-                                       detect_divergence=True, adaptive=True))
-        c = patches.Circle((x, y), radius=5, ec='r', fc='none',
-                           lw=2, alpha=0.8,
-                           label='Reference: RA = %f, Dec = %f' %
-                           (gaia['ra'][j], gaia['dec'][j]),
-                           picker=False)
-        ax.add_patch(c)
-        if j == 0:
-            all_c.append(c)
-            all_label.append('Gaia sources')
-
-    test = []
-    for k in range(len(sources)):
-        if k in good:
-            color = 'g'  # matches with gaia
-            leg = 'matched sources'
-        else:
-            color = 'b'  # not matched with gaia
-            leg = 'unmatched sources'
-        c = patches.Circle((sources['xcentroid'][k],
-                            sources['ycentroid'][k]),
-                           radius=5, ec=color,
-                           fc='none', lw=2, alpha=0.8,
-                           label='Position: x = %f, y = %f' %
-                           (sources['xcentroid'][k],
-                            sources['ycentroid'][k]), picker=False)
-        ax.add_patch(c)
-        if color not in test:
-            all_c.append(c)
-            all_label.append(leg)
-            test.append(color)
-
-        ax.legend(all_c, all_label)
-        ax.set_title(title)
-    plt.savefig(diag_path+fname, overwrite=True)
-
-
-def plot_cr(sci, cr_mask, sci_clean, bpm_mask, diag_path, imafile, root, filt,
-            log_fname):
-    """Plot cosmic ray cleaned image vs original and compare BPM to CR mask.
-
-    Parameters
-    ----------
-    sci (2xNxN array) : contains 2 ccds; original image before cosmic ray cleaning
-    cr_mask (2xNxN array) : contains 2 ccds; shows pixels that have been masked
-        as crs
-    sci_clean (2xNxN array) : containes 2 ccds; image after cosmic ray cleaning
-    bpm_mask (2xNxN array) : contains 2 ccds: shows pixels that have been masked
-        as bad
-    diag_path (str) : full path to diagnostic folder
-    imafile (str) : name of the ***
-    root (str) : ***
-    filt (str) : current filter (Sloan_g, etc)
-    log_fname (?) : log file to append print statements to
-
-    Returns
-    -------
-    None
-    """
-    vmin = np.nanmean(sci[1].data)-np.nanstd(sci[1].data)
-    vmax = np.nanmean(sci[1].data)+np.nanstd(sci[1].data)
-
-    fig, axes = plt.subplots(2, 2, figsize=(10, 10))
-    axes = axes.ravel()
-    axes[0].imshow(sci[1].data, cmap='gray', interpolation='none', origin='lower',
-                   vmin=vmin, vmax=vmax)
-    axes[0].set_title("Original Image")
-
-    axes[1].imshow(sci_clean, cmap='gray', interpolation='none', origin='lower',
-                   vmin=vmin, vmax=vmax)
-    axes[1].set_title("Cosmic ray cleaned image")
-
-    axes[2].imshow(bpm_mask[1].data, cmap='gray',
-                   interpolation='none', origin='lower')
-    axes[2].set_title("Bad pixel mask")
-
-    axes[3].imshow(cr_mask[1], cmap='gray', interpolation='none', origin='lower')
-    axes[3].set_title("Cosmic ray mask")
-    print_both(log_fname, 'Writing image to ',
-               diag_path+imafile.split('/')[-1][:-4] +
-               '_'+root+filt+'_ccd2.png')
-    plt.savefig(diag_path+imafile.split('/')[-1][:-4] +
-                '_'+root+filt+'_ccd2.png', overwrite=True)
+        return all_images
+    else:
+        print_both(log_fname, 'FOLDER DOES NOT EXIST:', path)
+        return []

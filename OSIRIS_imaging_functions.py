@@ -1,14 +1,5 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Mar 21 17:48:31 2022
+"""Contains functions used in OSIRIS_imaging_pipeline.py."""
 
-@author: amy
-"""
-from __future__ import print_function
-# from glob import glob
-# import argparse
-# import shutil
-# import os
 from astropy.io import fits
 import ccdproc
 from astropy.nddata import CCDData
@@ -16,14 +7,12 @@ import astropy.units as u
 import numpy as np
 from astropy.modeling import models
 import matplotlib.pyplot as plt
-# from astropy.visualization import ImageNormalize
 import matplotlib.patches as patches
 from astropy.wcs.utils import fit_wcs_from_points
 from astropy.coordinates import SkyCoord
 from astropy.wcs import wcs, WCS
 import sep
 from photutils.segmentation import make_source_mask
-# import sys
 from astroquery.ipac.irsa import Irsa
 from astropy import coordinates
 from astroquery.skyview import SkyView
@@ -157,7 +146,7 @@ def do_crmask(log_fname, all_sci_calib, mask_ccd, gain, rdnoise, saturation,
             # but I'm going to assume we don't care about them
             test_mask, _clean = detect_cosmics(np.array(
                 sci_proc_init[ccd].data),
-                inmask=np.array(mask_ccd[ccd]),  # None,
+                inmask=np.array(mask_ccd[ccd].data),  # None,
                 sigclip=4.5,  # lower values flag more pixels as
                 # cosmic rays
                 sigfrac=0.3,
@@ -171,7 +160,7 @@ def do_crmask(log_fname, all_sci_calib, mask_ccd, gain, rdnoise, saturation,
                 psfmodel='gauss', psffwhm=2.5, psfsize=7,
                 psfk=None, psfbeta=4.765,  # these are all defaults
                 verbose=True)
-
+            gtcsetup.print_both(log_fname, '------')
             cleaned_sci.append(_clean)
             cr_mask.append(np.multiply(test_mask, 1))
 
@@ -245,7 +234,11 @@ def do_bkg_sky_subtraction(all_sci_proc, all_headers, log_fname,
             gtcsetup.print_both(log_fname, '         Image', image+1)
 
             # use source extractor to calculate bakground and subtract it off
-            bkg = sep.Background(all_sci_proc[image][ccd].data)
+            try:
+                bkg = sep.Background(all_sci_proc[image][ccd].data)
+            except ValueError:
+                bkg = sep.Background(
+                    all_sci_proc[image][ccd].data.byteswap().newbyteorder())
             bkg_image1 = bkg.back()
             bkg_image = CCDData(bkg_image1, unit='electron')
             bkg_images.append(bkg_image)
@@ -277,26 +270,26 @@ def do_bkg_sky_subtraction(all_sci_proc, all_headers, log_fname,
             mask1 = make_source_mask(bkg_sub_img.data, nsigma=3, npixels=3,
                                      mask=all_sci_proc[image][ccd].mask)
 
-            new_hdul = fits.HDUList()
-            new_hdul.append(fits.ImageHDU(header=all_headers[image][0]))
-            new_hdul.append(fits.ImageHDU(data=mask1.astype(int),
-                                          header=all_headers[image][ccd+1]))
-            new_hdul.writeto(skymap_path+root+fnames[image].split('/')[-1][:-5] +
-                             '_'+filt+'_mask1_ccd'+str(ccd+1)+'.fits',
-                             overwrite=True)
+            # new_hdul = fits.HDUList()
+            # new_hdul.append(fits.ImageHDU(header=all_headers[image][0]))
+            # new_hdul.append(fits.ImageHDU(data=mask1.astype(int),
+            #                               header=all_headers[image][ccd+1]))
+            # new_hdul.writeto(skymap_path+root+fnames[image].split('/')[-1][:-5] +
+            #                  '_'+filt+'_mask1_ccd'+str(ccd+1)+'.fits',
+            #                  overwrite=True)
 
             intermediate = CCDData(
                 bkg_sub_img.data, unit='electron', mask=mask1)
 
             mask2 = make_source_mask(intermediate, nsigma=3, npixels=3)
 
-            new_hdul = fits.HDUList()
-            new_hdul.append(fits.ImageHDU(header=all_headers[image][0]))
-            new_hdul.append(fits.ImageHDU(data=mask2.astype(int),
-                                          header=all_headers[image][ccd+1]))
-            new_hdul.writeto(skymap_path+root+fnames[image].split('/')[-1][:-5] +
-                             '_'+filt+'_mask2_ccd'+str(ccd+1)+'.fits',
-                             overwrite=True)
+            # new_hdul = fits.HDUList()
+            # new_hdul.append(fits.ImageHDU(header=all_headers[image][0]))
+            # new_hdul.append(fits.ImageHDU(data=mask2.astype(int),
+            #                               header=all_headers[image][ccd+1]))
+            # new_hdul.writeto(skymap_path+root+fnames[image].split('/')[-1][:-5] +
+            #                  '_'+filt+'_mask2_ccd'+str(ccd+1)+'.fits',
+            #                  overwrite=True)
 
             # intermediate2 = CCDData(intermediate.data, unit='electron',
             #                         mask=mask2)
@@ -388,7 +381,12 @@ def do_bkg_subtraction(all_sci_proc, all_headers, log_fname, skymap_path):
             gtcsetup.print_both(log_fname, '         Image', image+1)
 
             # Use source extractor to calculate bakground and subtract it off
-            bkg = sep.Background(all_sci_proc[image][ccd].data)
+            try:
+                bkg = sep.Background(all_sci_proc[image][ccd].data)
+            except ValueError:
+                bkg = sep.Background(
+                    all_sci_proc[image][ccd].data.byteswap().newbyteorder())
+
             bkg_image1 = bkg.back()
             bkg_image = CCDData(bkg_image1, unit='electron')
 
@@ -597,7 +595,7 @@ def plot_check_img(img, final_wcs, tbl_crds):
     x1 = 100
     y = img.shape[0]-100
     x2 = img.shape[1]-100
-    print(x1, x2, y)
+
     ax.text(x1, y, 'YES', c='g')
     ax.text(x2, y, 'NO', c='g')
     # xs = [x1, x2]
@@ -611,8 +609,6 @@ def plot_check_img(img, final_wcs, tbl_crds):
                                 label='Position: x = %f, y = %f' %
                                 (x2, y), picker=True))
     all_patches = ax.patches
-
-    print('got patches')
 
     #########################
 
@@ -671,7 +667,7 @@ def get_gaia_img_cat(img, pix_limit, w, sky, log_fname):
     # Remove all nan flux entries
     gaia_ind = []
     for i in ind_init:
-        if np.isnan(gaia_flux_init[i]) == False:
+        if not np.isnan(gaia_flux_init[i]):  # == False:
             gaia_ind.append(i)
     gaia_ind = np.array(gaia_ind)
     # print(gaia_ind)
@@ -688,7 +684,10 @@ def get_gaia_img_cat(img, pix_limit, w, sky, log_fname):
 def get_osiris_obj_cat(img, fname, w, pix_limit, log_fname):
     """Test."""
     # detect sources in OSIRIS image using source extractor
-    bkg = sep.Background(img)  # .byteswap().newbyteorder())
+    try:
+        bkg = sep.Background(img)
+    except ValueError:
+        bkg = sep.Background(img.byteswap().newbyteorder())
     data_sub = img  # -bkg #bkg already subtracted
     objects = sep.extract(data_sub, 1.5, err=bkg.globalrms)
     gtcsetup.print_both(log_fname, 'Found ', len(objects), 'objects in ', fname)
@@ -717,7 +716,8 @@ def get_osiris_obj_cat(img, fname, w, pix_limit, log_fname):
     for i in range(len(sorted_x)):
         x = sorted_x[i]
         y = sorted_y[i]
-        if x > pix_limit and x < img.shape[1]-pix_limit and y > pix_limit and y < img.shape[0]-pix_limit:
+        if x > pix_limit and (x < img.shape[1]-pix_limit) and (
+                y > pix_limit) and (y < img.shape[0]-pix_limit):
             final_x.append(x)
             final_y.append(y)
     final_x = np.array(final_x)
@@ -739,7 +739,7 @@ def get_osiris_obj_cat(img, fname, w, pix_limit, log_fname):
     # print(obj_ra)
     # print(obj_dec)
 
-    return obj_ra, obj_dec
+    return obj_ra, obj_dec, final_x, final_y
 
 
 def in_circle(center_x, center_y, radius, x, y):
@@ -750,7 +750,6 @@ def in_circle(center_x, center_y, radius, x, y):
 
 def cross_match(all_patches, selected_pts, radius):
     """Test."""
-    print(all_patches)
     final_pts = []
     for pt in selected_pts:
         print('Pt', pt)
@@ -798,7 +797,8 @@ def final_check(img, final_wcs, tbl_crds, log_fname):
         return 'no'
 
 
-def do_interactive_astrometry(final_name, fname, log_fname):
+def do_interactive_astrometry(final_name, fname, full_filt, ccd, astrom_path,
+                              log_fname):
     """Allow the user to select stars in an image to perform astrometry on.
 
     This script will display the current OSIRIS image next to an SDSS image
@@ -832,7 +832,11 @@ def do_interactive_astrometry(final_name, fname, log_fname):
 
     Parameters
     ----------
+    final_name (str) : the name to write the corrected image to
     fname (str) : the name of the image to perform astrometry on (will be 1 ccd)
+    full_filt (str) : the current filter (ex: Sloan_z)
+    ccd 
+    astrom_path
     log_fname (?) : log file to append print statements to
 
     Returns
@@ -840,6 +844,8 @@ def do_interactive_astrometry(final_name, fname, log_fname):
     None
     """
     gtcsetup.print_both(log_fname, 'Doing interactive astrometry')
+
+    filt = full_filt.split('_')[-1]  # 'z'
 
     img = fits.open(fname)[1].data.byteswap().newbyteorder()
     hdr = fits.open(fname)[1].header
@@ -852,7 +858,8 @@ def do_interactive_astrometry(final_name, fname, log_fname):
     pix_limit = 0
     # Detect sources in the OSIRIS image and convert x/y to ra/dec using the
     # original wcs information
-    obj_ra, obj_dec = get_osiris_obj_cat(img, fname, w, pix_limit, log_fname)
+    obj_ra, obj_dec, final_x, final_y = get_osiris_obj_cat(img, fname, w,
+                                                           pix_limit, log_fname)
 
     # Get ra/dec of gaia stars that cover the OSIRIS image
     tbl_crds = get_gaia_img_cat(img, pix_limit, w, sky, log_fname)
@@ -866,7 +873,7 @@ def do_interactive_astrometry(final_name, fname, log_fname):
     # Get sdss image for testing purposes
     ref_img = SkyView.get_images(position=str(sky.ra.deg)+','+str(sky.dec.deg),
                                  # survey='SDSSz',
-                                 survey='SDSSz',
+                                 survey='SDSS'+filt,
                                  coordinates='J2000',
                                  pixels=str(img.shape[1])+','+str(img.shape[0]))[0]
     # Get wcs information from SDSS image
@@ -933,6 +940,9 @@ def do_interactive_astrometry(final_name, fname, log_fname):
 
     answer = final_check(img, final_wcs, tbl_crds, log_fname)
 
+    calc_astrometry_accuracy(img, final_wcs, final_x, final_y, tbl_crds, astrom_path,
+                             ccd, log_fname)
+
     if answer == 'no':
         gtcsetup.print_both(log_fname, 'REDOING ASTROMETRY ')
         do_interactive_astrometry(final_name, fname, log_fname)
@@ -945,6 +955,56 @@ def do_interactive_astrometry(final_name, fname, log_fname):
         new_hdul.writeto(final_name, overwrite=True)
         gtcsetup.print_both(log_fname, 'Writing final astrometry corrected image to',
                             final_name)
+
+
+def calc_astrometry_accuracy(img, final_wcs, final_x, final_y, tbl_crds, astrom_path,
+                             ccd, log_fname):
+    """Test."""
+    font_prop = font_manager.FontProperties(size=14)
+
+    obj_ra = []
+    obj_dec = []
+    for i in range(len(final_x)):
+        pos = final_wcs.all_pix2world(final_x[i], final_y[i], 0)
+        obj_ra.append(pos[0])
+        obj_dec.append(pos[1])
+    obj_ra = np.array(obj_ra)
+    obj_dec = np.array(obj_dec)
+
+    obj_crds = coordinates.SkyCoord(
+        obj_ra, obj_dec, unit=(u.deg, u.deg), frame='fk5')
+
+    idx, d2d, d3d = obj_crds.match_to_catalog_sky(tbl_crds)
+
+    cutoff = 2  # arcsec
+    good = np.where(d2d.arcsec < cutoff)[0]
+
+    fig = plt.figure(figsize=(12, 14))
+    # letter = fig3.canvas.mpl_connect('key_press_event', press)
+
+    ax = fig.add_subplot(121, projection=final_wcs)
+    ax.set_xlabel("RA", fontproperties=font_prop)
+    ax.set_ylabel("Dec", fontproperties=font_prop)
+    ax.set_title("CCD"+ccd, fontproperties=font_prop)
+    ax.imshow(img, origin='lower', cmap='gray', vmin=np.nanmean(
+        img)-np.nanstd(img), vmax=np.nanmean(img)+np.nanstd(img))
+    ax.plot(obj_ra[good], obj_dec[good], '.', transform=ax.get_transform('fk5'),
+            mec='k', mfc='none', label='OSIRIS')
+    ax.plot(obj_ra[good], obj_dec[good], 'o', transform=ax.get_transform('fk5'),
+            mec='r', mfc='none', label='OSIRIS matched')
+    ax.plot(tbl_crds.ra, tbl_crds.dec, '*', transform=ax.get_transform('fk5'),
+            mec='b', mfc='none', label='GAIA')
+    plt.legend()
+
+    ax2 = fig.add_subplot(122)
+    ax2.hist(d2d[good].arcsec)
+    ax2.set_xlabel('Separation (arcsec)', fontproperties=font_prop)
+    ax2.set_title("CCD"+ccd+': Median = '+str(round(
+        np.median(d2d[good].arcsec), 6))+'arcsec',
+        fontproperties=font_prop)
+
+    plt.savefig(astrom_path+'astrometry_accuracy_ccd'+ccd+'.png')
+    plt.show()
 
 
 def crop_padding(img):
@@ -986,7 +1046,7 @@ def crop_padding(img):
     return cropped_img
 
 
-def do_stacking(sci_final, all_headers, args, root, filt, log_fname):
+def do_stacking(sci_final, all_headers, args, root, filt, astrom_path, log_fname):
     """Test."""
     if len(sci_final) == 1:
         gtcsetup.print_both(log_fname, 'ONLY 1 IMAGE; NOT COMBINING')
@@ -1001,10 +1061,12 @@ def do_stacking(sci_final, all_headers, args, root, filt, log_fname):
     # Loop through each ccd so that at the end of the loop we can combine
     # all the images in one ccd
     final_aligned_image = []
+    footprints = []
     for ccd in range(len(sci_final[0])):
 
         gtcsetup.print_both(log_fname, '     CCD', ccd+1)
 
+        footprint_1ccd = []
         aligned_images = []
         # Loop through each image for a particular ccd
         for i, image in enumerate(sci_final):
@@ -1034,14 +1096,17 @@ def do_stacking(sci_final, all_headers, args, root, filt, log_fname):
                                    (np.nan, np.nan), (np.nan, np.nan)))
 
             # Align the current image with the first reference image
-            img_aligned, footprint = aa.register(
-                use_image, ref_imgs,
-                propagate_mask=True, detection_sigma=3.0)
-            # , unit='electron'))
+            try:
+                img_aligned, footprint = aa.register(
+                    use_image, ref_imgs,
+                    propagate_mask=True, detection_sigma=3.0)
+            except ValueError:
+                img_aligned, footprint = aa.register(
+                    use_image.byteswap().newbyteorder(), ref_imgs,
+                    propagate_mask=True, detection_sigma=3.0)
 
-            # if to_plot==True:
-            #     plt.figure()
-            #     plt.imshow(footprint, origin='lower')
+            # add the footprint image to an array
+            footprint_1ccd.append(footprint)
 
             # add the aligned image to an array
             aligned_images.append(np.array(img_aligned))
@@ -1050,7 +1115,7 @@ def do_stacking(sci_final, all_headers, args, root, filt, log_fname):
         aligned_images = np.array(aligned_images)
         median_aligned_img = np.nanmedian(aligned_images, axis=0)
 
-        # Too many nans for ccdproc.combine? so used numpy
+        # Too many nans for ccdproc.combine? so I used numpy instead
         # median_aligned_img = ccdproc.combine(aligned_images,
         #                       method='median')
 
@@ -1060,17 +1125,23 @@ def do_stacking(sci_final, all_headers, args, root, filt, log_fname):
         # Append the final aligned image as a CCDData object to be
         # written later
         final_aligned_image.append(CCDData(cropped_img, unit='electron'))
+        footprints.append(footprint_1ccd)
 
     # Write out the aligned/median combined images
     gtcsetup.write_ccd(all_headers[0][0], all_headers[0][1:],
                        final_aligned_image, args.outputdir,
                        'aligned.fits', root, filt, log_fname)
 
+    for i in range(len(footprint_1ccd)):
+        gtcsetup.write_ccd(all_headers[i][0], all_headers[i][1:],
+                           footprints.T[i], astrom_path,
+                           'footprint.fits', root, filt, log_fname)
+
     return final_aligned_image
 
 
-def do_astrometry(gaia, sources, wcs_ref, ima, log_fname):
-    """Correct the astrometry of an image.
+def do_auto_astrometry(gaia, sources, wcs_ref, ima, log_fname):
+    """Automatically correct the astrometry of an image.
 
     Parameters
     ----------

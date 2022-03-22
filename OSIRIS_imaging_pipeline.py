@@ -92,8 +92,6 @@ def main(argv):
 
     warnings.filterwarnings(action='ignore', message='All-NaN slice encountered')
 
-    print('ARGUMENTS:', argv[1:])
-
     # Instrument specific constants
     saturation = 65535
     gain = 0.95
@@ -114,6 +112,7 @@ def main(argv):
 
     log_fname = open(new_logfile, 'a')
     gtcsetup.print_both(log_fname, 'Writing output to file', new_logfile)
+    gtcsetup.print_both(log_fname, 'ARGUMENTS:', argv[1:])
 
     # ########################### ADMIN ####################################
     msg = 'Step 1: Administration'
@@ -133,11 +132,14 @@ def main(argv):
     gtcsetup.print_both(log_fname, '    Data are in directory', raw_path)
 
     gtcsetup.print_both(log_fname, '    Working on object ',
-                        args.objectid, 'in filters', args.filt)
+                        args.objectid, 'in filter(s)', args.filt)
 
     # get all fits files in directory
     gtcsetup.print_both(log_fname, '    Getting list of all files')
     raw_list = [i.replace(os.sep, '/') for i in glob(raw_path+'0*.fits*')]
+    if len(raw_list) == 0:
+        raw_list = [i.replace(os.sep, '/') for i in glob(raw_path+'0*.fits.gz*')]
+
     gtcsetup.print_both(log_fname, np.array(raw_list))
     gtcsetup.print_both(log_fname, '    Overwriting:', args.dooverwrite)
 
@@ -263,8 +265,11 @@ def main(argv):
             mask_ccd = [CCDData.read(bpmask_name,
                                      hdu=x+1, unit=u.dimensionless_unscaled)
                         for x in range(nccd)]
+
+            print('bpm', mask_ccd[0].data.shape, mask_ccd[1].data.shape)
+
             if not os.path.exists(bpmask_name):
-                sys.exit('*** FATAL ERROR *** Bad pixel mask file not found!')
+                sys.exit('*** FATAL ERROR *** Master bad pixel mask file not found!')
 
             # NOTE: sigma clipping is getting rid of vertical streaks in the science
             # images that are not in the master flat which is what the bad pixel mask
@@ -300,24 +305,29 @@ def main(argv):
 
             msg = 'Step 5: Science Frames; filter '+filt+'; object:'+root
             gtcsetup.print_both(log_fname, msg)
+            gtcsetup.print_both(
+                log_fname, 'Applying master bias, flat, bpm, and trimming')
             gtcsetup.print_both(log_fname, 'Found', len(obj), 'files')
 
             # #######################################################
             # ########### CALIBRATIONS (BIAS, FLAT BPM) #############
             # #######################################################
 
+            # Either do calibrations or read in images from diagnostic folder
+            # where calibrations have already been applied
             if args.docalib:
                 all_sci_calib, all_headers, all_filts = gtcdo.do_calib(
                     obj, filt, log_fname, nccd, mbias, mflat, mask_ccd, gain,
                     rdnoise, calib_path, bpm_path, root)
             else:
-                all_sci_calib = gtcsetup.read_in_files(calib_path)
+                all_sci_calib = gtcsetup.read_in_files(bpm_path, root, log_fname)
                 all_headers, all_filts = gtcsetup.get_header_info(obj, filt)
 
             # #######################################################
             # ################## COSMIC RAY REMOVAL #################
             # #######################################################
-
+            msg = 'Step 6: Cosmic Ray Removal'
+            gtcsetup.print_both(log_fname, msg)
             # cosmic ray cleaning must be done before sky subtraction
             # NOTE: it's still finding saturated stars as crs
             if args.docrmask is True:
@@ -329,9 +339,17 @@ def main(argv):
             else:
                 # Check for diagnostic folder with files; if files exist, read
                 # them in, otherwise, skip
-                all_sci_proc = copy.deepcopy(all_sci_calib)
-                gtcsetup.print_both(
-                    log_fname, '     Skipping cosmic ray rejection')
+                gtcsetup.print_both(log_fname, 'Checking for files in directory',
+                                    crmask_path)
+                gtcsetup.print_both(log_fname, 'Found', len(os.listdir(crmask_path)),
+                                    'files in directory')
+                if os.path.isdir(crmask_path) and len(os.listdir(crmask_path)) > 0:
+                    all_sci_proc = gtcsetup.read_in_files(
+                        crmask_path, 'CRmask_applied_'+root, log_fname)
+                else:
+                    all_sci_proc = copy.deepcopy(all_sci_calib)
+                    gtcsetup.print_both(
+                        log_fname, '     Skipping cosmic ray rejection')
 
             gtcsetup.print_both(log_fname, 'Time after applying calibrations'
                                 'and cosmic ray mask:',
@@ -343,7 +361,7 @@ def main(argv):
             # ################### SKY SUBTRACTION ###################
             # #######################################################
 
-            msg = 'Step 6: Background and sky subtraction'
+            msg = 'Step 7: Background and sky subtraction'
             gtcsetup.print_both(log_fname, msg)
 
             # If there is only one
@@ -354,9 +372,12 @@ def main(argv):
             else:
                 doskysub = args.doskysub
 
+            gtcsetup.print_both(log_fname, '    doskysub', doskysub)
+
             # If the user wants to subtract the sky, do it, otherwise just subtract
             # the background
             if doskysub is True:
+                gtcsetup.print_both(log_fname, 'Doing sky subtraction')
                 sci_final, sci_skymap = gtcdo.do_bkg_sky_subtraction(
                     all_sci_proc, all_headers, log_fname, skymap_path,
                     obj[all_filts], root, filt)
@@ -365,16 +386,31 @@ def main(argv):
                 gtcsetup.write_ccd(all_headers[0][0], all_headers[0][1:],
                                    sci_skymap, args.outputdir,
                                    'skymap.fits', root, filt, log_fname)
+                to_write = True
 
             else:
-                sci_final = gtcdo.do_bkg_subtraction(
-                    all_sci_proc, all_headers, log_fname, skymap_path)
+                # Check for diagnostic folder with files; if files exist, read
+                # them in, otherwise, skip
+                gtcsetup.print_both(log_fname, 'Checking for files in directory',
+                                    skymap_path)
+                gtcsetup.print_both(log_fname, 'Found', len(os.listdir(skymap_path)),
+                                    'files in directory')
+                if os.path.isdir(skymap_path) and len(os.listdir(skymap_path)) > 0:
+                    sci_final = gtcsetup.read_in_files(
+                        skymap_path, 'final_'+root, log_fname)
+                    to_write = False
+                else:
+                    gtcsetup.print_both(log_fname, 'Doing bkg subtraction')
+                    sci_final = gtcdo.do_bkg_subtraction(
+                        all_sci_proc, all_headers, log_fname, skymap_path)
+                    to_write = True
 
-            # Write out each calibrated science image
-            for i, f in enumerate(obj[all_filts]):
-                gtcsetup.write_ccd(all_headers[i][0], all_headers[i][1:],
-                                   sci_final[i], skymap_path,
-                                   f[:-5]+'_final.fits', root, filt, log_fname)
+            if to_write is True:
+                # Write out each calibrated science image
+                for i, f in enumerate(obj[all_filts]):
+                    gtcsetup.write_ccd(all_headers[i][0], all_headers[i][1:],
+                                       sci_final[i], skymap_path,
+                                       f[:-5]+'_final.fits', root, filt, log_fname)
 
             gtcsetup.print_both(log_fname, 'Time after doing sky/bkg subtraction:',
                                 (time()-tstart)/60., 'min')
@@ -385,7 +421,7 @@ def main(argv):
             # ##########################################################
 
             # Align images with eachother and then median combine
-            msg = 'Step 7: Astrometry'
+            msg = 'Step 8: Astrometry'
             gtcsetup.print_both(log_fname, msg)
 
             if args.dostack:
@@ -394,21 +430,33 @@ def main(argv):
                     log_fname, '     Part 1- Aligning images with eachother')
 
                 final_aligned_image = gtcdo.do_stacking(
-                    sci_final, all_headers, args, root, filt, log_fname)
+                    sci_final, all_headers, args, root, filt, log_fname, astrom_path)
 
                 gtcsetup.print_both(log_fname, 'Time after aligning images with '
                                     'eachother:', (time()-tstart)/60., 'min')
             else:
-                gtcsetup.print_both(log_fname, 'Images have already been stacked')
 
-                aligned1 = CCDData.read(
-                    args.outputdir+'aligned_'+root+filt+'_ccd1.fits',
-                    hdu=1, unit=u.electron)
-                aligned2 = CCDData.read(
-                    args.outputdir+'aligned_'+root+filt+'_ccd2.fits',
-                    hdu=1, unit=u.electron)
+                # Check for diagnostic folder with files; if files exist, read
+                # them in, otherwise, skip
+                if os.path.isdir(args.outputdir) and len(os.listdir(
+                        args.outputdir)) > 0:
 
-                final_aligned_image = [aligned1, aligned2]
+                    final_aligned_image = gtcsetup.read_in_files(
+                        args.outputdir, 'aligned_'+root, log_fname)[0]
+
+                else:
+
+                    gtcsetup.print_both(
+                        log_fname, 'Images have already been stacked')
+
+                    aligned1 = CCDData.read(
+                        args.outputdir+'aligned_'+root+filt+'_ccd1.fits',
+                        hdu=1, unit=u.electron)
+                    aligned2 = CCDData.read(
+                        args.outputdir+'aligned_'+root+filt+'_ccd2.fits',
+                        hdu=1, unit=u.electron)
+
+                    final_aligned_image = [aligned1, aligned2]
 
             # #################################s########################
             # ################## ASTROMETRY PT 2 #######################
@@ -427,12 +475,14 @@ def main(argv):
                     gtcsetup.print_both(log_fname, 'Working on CCD 1')
                     final_name = args.outputdir+'final_'+root+filt+'_ccd1.fits'
                     fname = args.outputdir+'aligned_'+root+filt+'_ccd1.fits'
-                    gtcdo.do_interactive_astrometry(final_name, fname, log_fname)
+                    gtcdo.do_interactive_astrometry(
+                        final_name, fname, filt, '1', astrom_path, log_fname)
 
                     gtcsetup.print_both(log_fname, 'Working on CCD 2')
                     final_name = args.outputdir+'final_'+root+filt+'_ccd2.fits'
                     fname = args.outputdir+'aligned_'+root+filt+'_ccd2.fits'
-                    gtcdo.do_interactive_astrometry(final_name, fname, log_fname)
+                    gtcdo.do_interactive_astrometry(
+                        final_name, fname, filt, '2', astrom_path, log_fname)
                     # int_tend = time()
                     # int_time = int_tend-int_tstart  # seconds
                     gtcsetup.print_both(log_fname, 'Time after doing interactive'
