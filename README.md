@@ -1,13 +1,13 @@
 # OSIRIS_Imaging_DRP
 This is a data reduction pipeline for OSIRIS imaging. It performs bias subtraction, flat division, bad pixel mask, cosmic ray cleaning, sky subtraction, astrometric correction, and stacking.
 
-Pipeline requirements **Check how to install (pip?):
+Pipeline requirements (install via 'pip install pkgname' unless otherwise noted):
 
-    python 3
+    python 3 - If you don't have Python 3 installed already, install it for your os with Anaconda https://www.anaconda.com/products/individual
     
     astroalign
     astropy
-    astroscrappy
+    astroscrappy    conda install -c conda-forge astroscrappy
     astroquery
     ccdproc
     matplotlib
@@ -16,12 +16,10 @@ Pipeline requirements **Check how to install (pip?):
     scipy
     sep
     
-NOTE: These two files come with the download on github and must be in the same directory as the main script.   
+NOTE: These two files come with the download on Github and must be in the same directory as the main script:   
 
     *local file- OSIRIS_imaging_gtcsetup.py
     *local file- OSIRIS_imaging_functions.py
-
-If you don't have Python 3 installed already, install it for your os with Anaconda https://www.anaconda.com/products/individual
 
 Store the pipeline and setup/functions files in your favorite folder and add the folder to your PATH and PYTHON_PATH environment. 
 To do this on LINUX/MAC in a terminal:
@@ -37,6 +35,7 @@ On WINDOWS, you can either use the AnacondaPrompt3 or you can install Ubuntu fro
 If you are using the AnacondaPrompt3 and you get an error saying 'the following arguments are required: objectid', check for the first print statement showing the arguments that the program read in (ex: INPUT TEXT HERE). If it is an empty list, search for the Registry Editor in the Windows search bar and open it. Click the down arrow on each of the following folders: HKEY_CLASSES_ROOT, Applications, python.exe, shell, open. Then click on 'command'. In the window on the right, double click on the name (Default) , then add 
     
     %*"
+    
 to the end of the text (the whole string should like like:
     
     "C:\Users\username\anaconda3\python.exe" "%1" %*"
@@ -68,7 +67,7 @@ If you have already done some of the steps with the pipeline and would like to s
     
 The output files are:
 
-    Calibration files:
+    Main files:
         MasterBias.fits
         MasterFlatSloan_g.fits (and other filters)
         MasterBPMSloan_g.fits (and other filters)
@@ -81,11 +80,12 @@ The output files are:
     
     Diagnostic folder which contains the following:
         1-calib
-            images with bias, fl split into ccd1 and ccd2 for both the target and standard star
+            images with bias, flat applied, split into ccd1 and ccd2 for both the target and standard star
         2-bpm
-        
+            images with the bad pixel mask applied, split into ccd1 and ccd2 for both the target and standard star
         3-crmask
-             CRmask images split into ccd1 and ccd2 for both the target and standard star
+            CRmask: Just the cosmic ray mask images split into ccd1 and ccd2 for both the target and standard star
+            CRmask_applied: Science images with the cosmic ray mask applied split into ccd1 and ccd2 for both the target and standard star
         4-skymap
             bkgimg - the background image as determined by source extractor (sep.Background())
             mask1 - the mask after the first round of sigma clipping to remove stars
@@ -97,4 +97,6 @@ The output files are:
 See the output folder in INSERT HERE for examples of a good master bias, flat, sky map, and final image as well as the raw data (which is also in the copy folder).
 
 Some parameters you may want to change are:
+
+    -INSERT HERE
 
