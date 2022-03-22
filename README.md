@@ -66,14 +66,17 @@ The output files are:
     
     Diagnostic folder which contains the following:
         1-calib
-            original images split into ccd1 and ccd2 for both the target and standard star
+            images with bias, fl split into ccd1 and ccd2 for both the target and standard star
         2-bpm
         
         3-crmask
              CRmask images split into ccd1 and ccd2 for both the target and standard star
         4-skymap
-            
+            bkgimg - the background image as determined by source extractor (sep.Background())
+            mask1 - the mask after the first round of sigma clipping to remove stars
+            mask2 - the mask after the second round of sigma clipping to remove stars
+            sciN_final - 
         5-astrometry
             images after aligning with eachother split into ccd1 and ccd2 for both the target and standard star
         
-See *** for examples of a good master bias, flat, sky map, and final image.
+See the output folder in https://drive.google.com/drive/folders/1FGA9IsR2tKaQqxZk3xpxvyofqfFDJq0f?usp=sharing for examples of a good master bias, flat, sky map, and final image as well as the raw data.
