@@ -14,6 +14,7 @@ Pipeline requirements:
     scipy
     numpy
     matplotlib
+    spalipy
     *local file- OSIRIS_imaging_setup.py
 
 The pipeline can be run from any folder and is used with the following syntax:
@@ -22,11 +23,14 @@ python OSIRIS_phot_pipeline.py
 OBJNAME
 --workdir "C:\Users\path\to\raw_files"
 --outputdir "C:\Users\test\path\to\output"
+--dooverwrite True
 --dobias
 --doflat
 --domask
+--docrmask
+--doskysub
 --dowcs
---dooverwrite False
+--dointeractive
 --filter g,i,z
 
 OBJNAME is a required input and it is the name of the object that is given in
@@ -47,74 +51,48 @@ OBJNAME
 --filter g,i,z
 
 Things to update in the future:
-     add check on astrometry
      handle .gz files
      create configuration file for parameters that can be changed
          or just make note of them up here
-     save diagnostic figures
      do something else if no gaia stars are found
 
 NOTE: If --dooverwrite is True but you don't have --dobias --doflat and --domask,
-all files will be deleted and the program will crash.
+all files will be deleted so there will be no master files and the program
+will crash.
 """
-
-__author__ = "A. Gottlieb"
-__created__ = "2021-11-03"
-
+# # Local dependencies
+import OSIRIS_imaging_setup as gtcsetup
+import OSIRIS_imaging_functions as gtcdo
+####
 from time import time
 from glob import glob
-import os
 import sys
 import copy
 import ccdproc
 import numpy as np
+# import matplotlib.pyplot as plt
 from astropy.nddata import CCDData
 import astropy.units as u
-from astropy.stats import SigmaClip, sigma_clipped_stats
 from astropy.io import fits
-from astropy.modeling import models
-from astropy.coordinates import SkyCoord
-from astropy.wcs import wcs
-from astroquery.ipac.irsa import Irsa
-from photutils import DAOStarFinder
-from photutils.background import MedianBackground
-from astroscrappy import detect_cosmics
-import matplotlib.pyplot as plt
 from datetime import datetime
+import os
+import warnings
+###
+# from matplotlib import use
+# use('Agg')
 
-# # Local dependencies
-import OSIRIS_imaging_setup as gtcsetup
+
+__author__ = "A. Gottlieb"
+__created__ = "2021-11-03"
 
 
 def main(argv):
-    r"""Pipeline can be run from its folder and is used with the following syntax.
-
-    python OSIRIS_phot_pipeline.py
-    OBJNAME
-    --workdir "C:\Users\path\to\raw_files"
-    --outputdir "C:\Users\path\to\raw_files\output"
-    --dobias
-    --doflat
-    --domask
-    --dooverwrite False
-    --filter g,i,z
-
-    If you already have master bias, flats, bpmask they must be named
-    MasterBias.fits or MasterFlatSloan_g.fits or MasterBPMSloan_g.fits OR be
-    specified via --bias etc below.
-    To run after creating master bias+flat+mask:
-
-    python OSIRIS_phot_pipeline.py
-    OBJNAME
-    --workdir "C:\Users\test\raw_files"
-    --outputdir "C:\Users\test\raw_files\output"
-    --bias MasterBias
-    --flat MasterFlat
-    --mask MasterBPM
-    --dooverwrite False
-    --filter g,i,z
-    """
+    """Imaging reduction pipeline."""
     tstart = time()
+
+    warnings.filterwarnings(action='ignore', message='All-NaN slice encountered')
+
+    print('ARGUMENTS:', argv[1:])
 
     # Instrument specific constants
     saturation = 65535
@@ -123,18 +101,21 @@ def main(argv):
     nccd = 2
     # ccdgap  = 37   # pixels
 
-    to_plot = False
-
+    # ############################## SETUP #################################
     # Get input arguments
     args, use_slash = gtcsetup.read_args()
 
     now = datetime.now()  # current date and time
     date_time = now.strftime("%m-%d-%Y_%H-%M-%S")
+
+    # Create log file name based on current date/time so you have a new file
+    # each time you run
     new_logfile = args.workdir+args.logfile[:-4]+date_time+'.txt'
 
     log_fname = open(new_logfile, 'a')
     gtcsetup.print_both(log_fname, 'Writing output to file', new_logfile)
 
+    # ########################### ADMIN ####################################
     msg = 'Step 1: Administration'
     gtcsetup.print_both(log_fname, msg)
 
@@ -142,7 +123,7 @@ def main(argv):
     topdir = args.workdir
     gtcsetup.print_both(log_fname, topdir)
 
-    # move into the working directory
+    # Move into the working directory
     os.chdir(topdir)
     gtcsetup.print_both(log_fname, '    Changing to directory', topdir)
     raw_path = topdir
@@ -163,12 +144,15 @@ def main(argv):
     # directory for all diagnostic images such as sky frames or cosmic ray mask
     diag_path = args.outputdir+'diagnostic/'
     gtcsetup.print_both(log_fname, 'Diagnostic path:', diag_path)
+
     # sort files into different folders based on header information
-    fb, ff, fsci, fstd = gtcsetup.sort_files(args.objectid,
-                                             raw_path, raw_list,
-                                             use_slash, args.outputdir,
-                                             args.dooverwrite,
-                                             diag_path, log_fname)
+    # fb, ff etc are lists of files containing the full path
+    fb, ff, fsci, fstd, all_paths = gtcsetup.sort_files(args.objectid,
+                                                        raw_path, raw_list,
+                                                        use_slash, args.outputdir,
+                                                        args.dooverwrite,
+                                                        diag_path, log_fname)
+    calib_path, bpm_path, crmask_path, skymap_path, astrom_path = all_paths
 
     # print the observing log;
     # ****NOTE: THIS CAN BE USED TO CHECK HEADER INFORMATION FOR ALL FILES****
@@ -181,6 +165,14 @@ def main(argv):
         sys.exit()
 
     gtcsetup.print_both(log_fname, '--------------------------------------')
+
+    if len(fsci) == 0:
+        sys.exit('No science images found; check your OBJNAME.')
+
+    # #######################################################
+    # ##################### MASTER BIAS #####################
+    # #######################################################
+
     msg = 'Step 2: Master Bias'
     gtcsetup.print_both(log_fname, msg)
 
@@ -200,15 +192,23 @@ def main(argv):
         if not os.path.exists(args.outputdir+args.biasfile+'.fits'):
             sys.exit('*** FATAL ERROR *** Bias file not found!')
 
+    gtcsetup.print_both(log_fname, 'Time after creating master bias:',
+                        time()-tstart, 'seconds')
+
+    #########################################################################
+
     # Get all filters taken in observations
-    all_filt = gtcsetup.get_filters(args.filt.split(','))
+    all_obs_filt = gtcsetup.get_filters(args.filt.split(','))
     gtcsetup.print_both(log_fname, '-------------------------------------------')
-    gtcsetup.print_both(log_fname, 'Now looping through filters:', all_filt)
+    gtcsetup.print_both(log_fname, 'Now looping through filters:', all_obs_filt)
 
     # Loop through filters
-    for filt in all_filt:
+    for filt in all_obs_filt:
         gtcsetup.print_both(log_fname, 'Running through filter', filt)
 
+        # #######################################################
+        # ##################### MASTER FLAT #####################
+        # #######################################################
         msg = 'Step 3: Master Flat; filter '+filt
         gtcsetup.print_both(log_fname, msg)
 
@@ -229,7 +229,14 @@ def main(argv):
             if not os.path.exists(flatname):
                 sys.exit('*** FATAL ERROR *** Flat file not found!')
 
+        gtcsetup.print_both(log_fname, 'Time after creating master flat:',
+                            time()-tstart, 'seconds')
         gtcsetup.print_both(log_fname, '---------------------')
+
+        # #######################################################
+        # ################### BAD PIXEL MASK ####################
+        # #######################################################
+
         msg = 'Step 4: Mask Bad Pixels; filter '+filt
         gtcsetup.print_both(log_fname, msg)
 
@@ -237,7 +244,7 @@ def main(argv):
         if args.domask:
             with fits.open(flatname) as fits_open:
                 hdr = fits_open[0].header
-            mask = [ccdproc.ccdmask(mflat[k], findbadcolumns=False)
+            mask = [ccdproc.ccdmask(mflat[k])  # , findbadcolumns=False)
                     for k in range(nccd)]
             mask_ccd = [CCDData(data=x.astype('uint8'),
                                 unit=u.dimensionless_unscaled) for x in mask]
@@ -245,6 +252,8 @@ def main(argv):
             for x in mask_ccd:
                 mask_hdu.append(fits.ImageHDU(x.data))
             # Bad pixels have value of 1, good pixels have a value of 0
+            gtcsetup.print_both(log_fname, '    Writing bad pixel mask to ',
+                                args.outputdir+'MasterBPM'+filt+'.fits')
             mask_hdu.writeto(args.outputdir+'MasterBPM'+filt+'.fits', overwrite=True)
         else:
             # Again noting the file must be called MasterBPMSloan_g.fits etc
@@ -257,236 +266,209 @@ def main(argv):
             if not os.path.exists(bpmask_name):
                 sys.exit('*** FATAL ERROR *** Bad pixel mask file not found!')
 
-        objs = [fsci, fstd]
+            # NOTE: sigma clipping is getting rid of vertical streaks in the science
+            # images that are not in the master flat which is what the bad pixel mask
+            # is based on
 
+        gtcsetup.print_both(log_fname, 'Time after creating master bad pixel mask:',
+                            time()-tstart, 'seconds')
+        gtcsetup.print_both(log_fname, '---------------------')
+
+        ############################################################
+        if int(args.reduce_obj) == 0:
+            gtcsetup.print_both(log_fname, 'Only reducing the science target')
+            objs = [fsci]
+            roots = [args.objectid.replace(' ', '')+'_OSIRIS_']
+        elif int(args.reduce_obj) == 1:
+            gtcsetup.print_both(log_fname, 'Only reducing the standard star')
+            objs = [fstd]
+            roots = ['Standard_Star_OSIRIS_']
+        else:
+            gtcsetup.print_both(
+                log_fname, 'Reducing the science target AND the standard star')
+            roots = [args.objectid.replace(
+                ' ', '')+'_OSIRIS_', 'Standard_Star_OSIRIS_']
+            objs = [fsci, fstd]
+
+        # Loop through target object and standard star
         for z, obj in enumerate(objs):
-            if z == 0:
-                root = args.objectid.replace(' ', '')+'_OSIRIS_'
-            else:
-                root = 'Standard_Star_OSIRIS_'
+
+            obj = np.array(obj)
+            root = roots[z]
+
             gtcsetup.print_both(log_fname, '---------------------')
+
             msg = 'Step 5: Science Frames; filter '+filt+'; object:'+root
             gtcsetup.print_both(log_fname, msg)
+            gtcsetup.print_both(log_fname, 'Found', len(obj), 'files')
 
-            for j, f in enumerate(obj):
-                with fits.open(f) as fits_open:
-                    # Note: because images have been trimmed, the wcs information is
-                    # no longer correct; subtract off the trimmed amount to get close
-                    hdr = fits_open[0].header
+            # #######################################################
+            # ########### CALIBRATIONS (BIAS, FLAT BPM) #############
+            # #######################################################
 
-                    hdr1 = fits_open[1].header
-                    trim1 = hdr1['TRIMSEC'].split(':')[0][1:]
-                    hdr1['CRPIX1'] = float(hdr1['CRPIX1'])-float(trim1)
+            if args.docalib:
+                all_sci_calib, all_headers, all_filts = gtcdo.do_calib(
+                    obj, filt, log_fname, nccd, mbias, mflat, mask_ccd, gain,
+                    rdnoise, calib_path, bpm_path, root)
+            else:
+                all_sci_calib = gtcsetup.read_in_files(calib_path)
+                all_headers, all_filts = gtcsetup.get_header_info(obj, filt)
 
-                    hdr2 = fits_open[2].header
-                    trim2 = hdr2['TRIMSEC'].split(':')[0][1:]
-                    hdr2['CRPIX1'] = float(hdr2['CRPIX1'])-float(trim2)
+            # #######################################################
+            # ################## COSMIC RAY REMOVAL #################
+            # #######################################################
 
-                    hdrs = [hdr1, hdr2]
-                    hdr_filt = hdr['FILTER2']
+            # cosmic ray cleaning must be done before sky subtraction
+            # NOTE: it's still finding saturated stars as crs
+            if args.docrmask is True:
 
-                    # get initial wcs info from header
-                    if j == 0:
-                        # NOTE: somehow updating hdr1 and 2 above also updates
-                        # this header too...
-                        wcs_ref = [wcs.WCS(fits_open[k+1]) for k in range(nccd)]
+                all_sci_proc = gtcdo.do_crmask(
+                    log_fname, all_sci_calib, mask_ccd, gain, rdnoise, saturation,
+                    obj[all_filts], all_headers, root, filt, nccd, crmask_path)
 
-                    # Skip over this image if its filter does not match the
-                    # current one
-                    if hdr_filt != filt:
-                        continue
+            else:
+                # Check for diagnostic folder with files; if files exist, read
+                # them in, otherwise, skip
+                all_sci_proc = copy.deepcopy(all_sci_calib)
+                gtcsetup.print_both(
+                    log_fname, '     Skipping cosmic ray rejection')
 
-                    gtcsetup.print_both(log_fname, '    Working on file', f)
-                    # get raw frame
-                    sci_raw = [CCDData.read(f, hdu=k+1, unit='adu')
-                               for k in range(nccd)]
+            gtcsetup.print_both(log_fname, 'Time after applying calibrations'
+                                'and cosmic ray mask:',
+                                (time()-tstart)/60., 'min')
 
-                    # apply bias, flat, bpm corrections
-                    # again noting that Nora had the oscan, oscan_model and trim;
-                    # I didn't change this
-                    sci_proc_init = [ccdproc.ccd_process(
-                        x, oscan='[3:22,:]',
-                        oscan_model=models.Chebyshev1D(3),
-                        trim=x.header['TRIMSEC'],
-                        master_bias=mbias[k],
-                        master_flat=mflat[k],
-                        bad_pixel_mask=np.array(mask_ccd[k]),
-                        gain=gain*u.electron/u.adu,
-                        readnoise=rdnoise*u.electron,
-                        gain_corrected=True)
-                        for k, x in enumerate(sci_raw)]
+            gtcsetup.print_both(log_fname, '---------------------')
 
-                    sci_proc_no_bpm = [ccdproc.ccd_process(
-                        x, oscan='[3:22,:]',
-                        oscan_model=models.Chebyshev1D(3),
-                        trim=x.header['TRIMSEC'],
-                        master_bias=mbias[k],
-                        master_flat=mflat[k],
-                        bad_pixel_mask=None,
-                        gain=gain*u.electron/u.adu,
-                        readnoise=rdnoise*u.electron,
-                        gain_corrected=True)
-                        for k, x in enumerate(sci_raw)]
+            # #######################################################
+            # ################### SKY SUBTRACTION ###################
+            # #######################################################
 
-                    if to_plot is True:
-                        plt.figure()
-                        plt.imshow(sci_proc_no_bpm[1].data-sci_proc_init[1].data,
-                                   interpolation=None, origin='lower')
-                    # print(sci_proc_no_bpm[1].data-sci_proc_init[1].data)
-                    # sys.exit()
-                    # cosmic ray cleaning must be done before sky subtraction
-                    # NOTE: it's still finding saturated stars as crs
+            msg = 'Step 6: Background and sky subtraction'
+            gtcsetup.print_both(log_fname, msg)
 
-                    gtcsetup.print_both(log_fname, '    Removing cosmic rays')
-                    cleaned_sci = []
-                    cr_mask = []
-                    for x in range(len(sci_proc_init)):
-                        # cr_cleaned = ccdproc.cosmicray_lacosmic(x, gain=1.0,
-                        # sig_clip=5)
+            # If there is only one
+            if len(all_sci_proc) == 1:
+                gtcsetup.print_both(
+                    log_fname, 'Only 1 image; not doing sky subtraction')
+                doskysub = False
+            else:
+                doskysub = args.doskysub
 
-                        test_mask, _clean = detect_cosmics(np.array(
-                            sci_proc_init[x].data),
-                            # NOTE: want None, otherwise bad pixels aren't
-                            # masked out?
-                            inmask=None,
-                            sigclip=4.5,  # lower values flag more pixels as
-                            # cosmic rays
-                            sigfrac=0.3,
-                            objlim=10.0,  # increase if centers of stars flagged
-                            # as cosmic rays
-                            gain=gain, readnoise=rdnoise, satlevel=saturation,
-                            niter=4, sepmed=True,
-                            cleantype='meanmask', fsmode='median',
-                            psfmodel='gauss', psffwhm=2.5, psfsize=7,
-                            psfk=None, psfbeta=4.765,
-                            verbose=True)
+            # If the user wants to subtract the sky, do it, otherwise just subtract
+            # the background
+            if doskysub is True:
+                sci_final, sci_skymap = gtcdo.do_bkg_sky_subtraction(
+                    all_sci_proc, all_headers, log_fname, skymap_path,
+                    obj[all_filts], root, filt)
 
-                        cleaned_sci.append(_clean)
-                        cr_mask.append(np.multiply(test_mask, 1))
+                # Write out the sky image
+                gtcsetup.write_ccd(all_headers[0][0], all_headers[0][1:],
+                                   sci_skymap, args.outputdir,
+                                   'skymap.fits', root, filt, log_fname)
 
-                    if to_plot is True:
-                        gtcsetup.plot_cr(sci_proc_init, cr_mask, cleaned_sci[1],
-                                         mask_ccd, diag_path +
-                                         'crmask/', f[:-5]+'_CRmask.png',
-                                         root, filt, log_fname)
+            else:
+                sci_final = gtcdo.do_bkg_subtraction(
+                    all_sci_proc, all_headers, log_fname, skymap_path)
 
-                    # check how cosmic ray mask is affecting the image
-                    # plt.figure()
-                    # plt.imshow(cleaned_sci[1]-sci_proc_init[1].data,
-                    #            interpolation=None, origin='lower')
+            # Write out each calibrated science image
+            for i, f in enumerate(obj[all_filts]):
+                gtcsetup.write_ccd(all_headers[i][0], all_headers[i][1:],
+                                   sci_final[i], skymap_path,
+                                   f[:-5]+'_final.fits', root, filt, log_fname)
 
-                    sci_proc = copy.deepcopy(sci_proc_init)
-                    sci_proc[0].data = cleaned_sci[0]
-                    sci_proc[1].data = cleaned_sci[1]
+            gtcsetup.print_both(log_fname, 'Time after doing sky/bkg subtraction:',
+                                (time()-tstart)/60., 'min')
+            gtcsetup.print_both(log_fname, '---------------------')
 
-                    # Write out cosmic ray masks to diagnostic folders
-                    gtcsetup.write_ccd(hdr, hdrs, cr_mask, diag_path+'crmask/',
-                                       f[:-5]+'_CRmask.fits', root, filt, log_fname)
+            # #################################s########################
+            # ################## ASTROMETRY PT 1 #######################
+            # ##########################################################
 
-                    # Get the mean sky of the current image; Nora set these vals
-                    median_sky = MedianBackground(SigmaClip(sigma=3., maxiters=10))
-                    gtcsetup.print_both(log_fname, 'Median sky:', median_sky)
-                    # Create the skymap for the current image using the mean sky
-                    # will be array of all one number
-                    sci_skymap = [
-                        median_sky.calc_background(x)*np.ones(np.shape(x))*u.electron
-                        for x in sci_proc]
+            # Align images with eachother and then median combine
+            msg = 'Step 7: Astrometry'
+            gtcsetup.print_both(log_fname, msg)
 
-                    # Write out sky map to diagnostic folders
-                    # gtcsetup.write_ccd(hdr, hdrs, sci_skymap, diag_path+'skymap/',
-                    #                    f[:-5]+'_skymap.fits', root, filt, log_fname)
+            if args.dostack:
 
-                    # Subtract the skymap from the current image in both ccds
-                    sky_sub = [x.subtract(sci_skymap[k],
-                                          propagate_uncertainties=True,
-                                          handle_meta='first_found')
-                               for k, x in enumerate(sci_proc)]
+                gtcsetup.print_both(
+                    log_fname, '     Part 1- Aligning images with eachother')
 
-                    # Divide sky subtracted image by the exposure time
-                    sci_final = [x.divide(hdr['EXPTIME']*u.second,
-                                          propagate_uncertainties=True,
-                                          handle_meta='first_found')
-                                 for x in sky_sub]
+                final_aligned_image = gtcdo.do_stacking(
+                    sci_final, all_headers, args, root, filt, log_fname)
 
-                    # if args.dowcs:
-                    for n in range(len(sci_final)):
-                        gtcsetup.print_both(
-                            log_fname, '    Working on wcs info for CCD', n)
-                        ima = sci_final[n]
-                        imafile = f
+                gtcsetup.print_both(log_fname, 'Time after aligning images with '
+                                    'eachother:', (time()-tstart)/60., 'min')
+            else:
+                gtcsetup.print_both(log_fname, 'Images have already been stacked')
 
-                        # get approximate center of ccd
-                        sky = wcs_ref[n].pixel_to_world(
-                            ima.shape[1]/2, ima.shape[0]/2)
+                aligned1 = CCDData.read(
+                    args.outputdir+'aligned_'+root+filt+'_ccd1.fits',
+                    hdu=1, unit=u.electron)
+                aligned2 = CCDData.read(
+                    args.outputdir+'aligned_'+root+filt+'_ccd2.fits',
+                    hdu=1, unit=u.electron)
 
-                        # Get gaia comparison catalog centered on ccd
-                        # using cone with radius 6 arcmin (Nora chose this)
-                        # NOTE: radius of 6 gives circle, larger radius gives
-                        # weird shape that doesn't cover the ccd...
-                        gaia = Irsa.query_region(SkyCoord(sky.ra, sky.dec,
-                                                          frame='fk5'),
-                                                 catalog="gaia_dr2_source",
-                                                 spatial="Cone", radius=6*u.arcmin)
+                final_aligned_image = [aligned1, aligned2]
 
-                        if len(gaia) == 0:
-                            gtcsetup.print_both(log_fname, 'No GAIA stars found \
-                                                within search radius for filter.')
-                            # TO DO: do something else? exclude this image from
-                            # further processing
-                            break
+            # #################################s########################
+            # ################## ASTROMETRY PT 2 #######################
+            # ##########################################################
 
-                        # again Nora chose these values, I didn't change them
-                        mean, median, std = sigma_clipped_stats(ima, sigma=3.0)
-                        daofind = DAOStarFinder(fwhm=8., threshold=8.*std)
-                        sources = daofind(np.asarray(ima))  # sources in image
-                        if len(sources) == 0:
-                            sys.exit('No sources detected within image.')
+            if args.dowcs:
 
-                        # First pass at fixing astrometry (cross reference gaia
-                        # catalog with sources in image to get matched list,
-                        w, good = gtcsetup.do_astrometry(gaia, sources,
-                                                         wcs_ref[n], ima, log_fname)
+                gtcsetup.print_both(
+                    log_fname, '     Part 2- Aligning median combined image',
+                    ' with GAIA')
 
-                        # Second pass
-                        w2, good2 = gtcsetup.do_astrometry(
-                            gaia, sources, w, ima, log_fname)
+                # Do the interactive astrometry or automatic astrometry
+                if args.dointeractive:
+                    # int_tstart = time()
+                    # Final image is written to fits file inside this function
+                    gtcsetup.print_both(log_fname, 'Working on CCD 1')
+                    final_name = args.outputdir+'final_'+root+filt+'_ccd1.fits'
+                    fname = args.outputdir+'aligned_'+root+filt+'_ccd1.fits'
+                    gtcdo.do_interactive_astrometry(final_name, fname, log_fname)
 
-                        if to_plot is True:
-                            title = 'image ' + str(j)+' ccd ' + \
-                                str(n) + ' filter '+filt
+                    gtcsetup.print_both(log_fname, 'Working on CCD 2')
+                    final_name = args.outputdir+'final_'+root+filt+'_ccd2.fits'
+                    fname = args.outputdir+'aligned_'+root+filt+'_ccd2.fits'
+                    gtcdo.do_interactive_astrometry(final_name, fname, log_fname)
+                    # int_tend = time()
+                    # int_time = int_tend-int_tstart  # seconds
+                    gtcsetup.print_both(log_fname, 'Time after doing interactive'
+                                        'astrometry:', (time()-tstart)/60., 'min')
+                else:
+                    # int_time = 0.
+                    astro_cor_image = gtcdo.do_auto_astrometry(
+                        final_aligned_image)
+                    gtcsetup.print_both(log_fname, 'Time after doing automatic '
+                                        'astrometry:', (time()-tstart)/60., 'min')
 
-                            gtcsetup.plot_sources(wcs_ref[n], wcs_ref[n], ima,
-                                                  'before correcting'+title,
-                                                  sources, gaia,
-                                                  np.arange(len(sources)))
-                            #     gtcsetup.plot_sources(
-                            #         w, w, ima, 'first pass'+title,
-                            #         sources, gaia, good)
+                    # Write out the final image to the output folder
+                    gtcsetup.write_ccd(all_headers[0][0], all_headers[0][1:],
+                                       astro_cor_image, args.outputdir,
+                                       'final.fits', root, filt, log_fname)
 
-                            gtcsetup.plot_sources(w2, w2, ima,
-                                                  'second pass'+title,
-                                                  sources, gaia, good2)
-
-                        fits_open[n+1].header.update(w2.to_header(relax=True))
-                        hdrs[n].update(w2.to_header(relax=True))
-
-                    # Write out 2 ccds to 2 separate files with correct headers
-                    gtcsetup.write_ccd(hdr, hdrs, sci_final, args.outputdir,
-                                       imafile, root, filt, log_fname)
-
-                    gtcsetup.print_both(log_fname, '--------------------------')
-
-            # Get all files needed to combine
-            gtcsetup.combine_files(args.outputdir, root, filt, diag_path,
-                                   use_slash, log_fname)
+            gtcsetup.print_both(log_fname,
+                                'Total execution time for one object in one filter:',
+                                ((time()-tstart))/60., 'min')
 
             gtcsetup.print_both(
                 log_fname, '--------------------------------------------------')
-    gtcsetup.print_both(log_fname, 'Total execution time',
+
+        gtcsetup.print_both(log_fname,
+                            'Total execution time for both objects in one filter:',
+                            ((time()-tstart))/60., 'min')
+
+    gtcsetup.print_both(log_fname,
+                        'Total execution time for all objects in all filters:',
                         ((time()-tstart))/60., 'min')
+
     gtcsetup.print_both(log_fname, '*** Done ***')
+
     log_fname.close()
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+
+    main(sys.argv)
