@@ -1,8 +1,10 @@
 # OSIRIS_Imaging_DRP
 This is a data reduction pipeline for OSIRIS imaging. It performs bias subtraction, flat division, bad pixel mask, cosmic ray cleaning, sky subtraction, astrometric correction, and stacking.
 
-Pipeline requirements:
+Pipeline requirements **Check how to install (pip?):
+
     python 3
+    
     astroalign
     astropy
     astroscrappy
@@ -13,6 +15,9 @@ Pipeline requirements:
     photutils
     scipy
     sep
+    
+NOTE: These two files come with the download on github and must be in the same directory as the main script.   
+
     *local file- OSIRIS_imaging_gtcsetup.py
     *local file- OSIRIS_imaging_functions.py
 
@@ -89,7 +94,7 @@ The output files are:
         5-astrometry
             images after aligning with eachother split into ccd1 and ccd2 for both the target and standard star
         
-See the output folder in https://drive.google.com/drive/folders/1FGA9IsR2tKaQqxZk3xpxvyofqfFDJq0f?usp=sharing for examples of a good master bias, flat, sky map, and final image as well as the raw data.
+See the output folder in INSERT HERE for examples of a good master bias, flat, sky map, and final image as well as the raw data (which is also in the copy folder).
 
 Some parameters you may want to change are:
 
