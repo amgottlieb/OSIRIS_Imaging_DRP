@@ -11,6 +11,7 @@ from astropy.nddata import CCDData
 import astropy.units as u
 import numpy as np
 from astropy.modeling import models
+from photutils.segmentation import make_source_mask
 
 
 def print_both(file, *args):
@@ -57,6 +58,9 @@ def parse_args():
         help='Choose which object to reduce: 0 for science, 1 for standard, \
             2 for both. Default: 2')
 
+    add('--doobslog', dest='doobslog', action='store_true',
+        help='Create an observing log without going through the full reduction.')
+
     add('--dobias', dest='dobias', action='store_true',
         help='Make the master bias instead of reading it from input file.')
 
@@ -68,6 +72,10 @@ def parse_args():
 
     add('--flat', dest='flatfile', default='MasterFlat',
         help='Name of the input master flat file. Default: MasterFlat')
+
+    add('--maskflat', dest='maskflat', default=False, help='If there are stars \
+        in your flat that are not removed with the normal method, set this value \
+            to true to mask out the stars.')
 
     add('--dobpm', dest='domask', action='store_true',
         help='Create the master bad pixel mask instead of reading it from the \
@@ -82,10 +90,6 @@ def parse_args():
     add('--docrmask', dest='docrmask', action='store_true',
         help='Run cosmic ray rejection.')
 
-    add('--logfile', dest='logfile', default='log.txt',
-        help='Name of the file which contains all print statements from the \
-            pipeline.')
-
     add('--doskysub', dest='doskysub', action='store_true',
         help='Perform sky subtraction.')
 
@@ -99,8 +103,9 @@ def parse_args():
     add('--dointeractive', dest='dointeractive', action='store_true',
         help='Manually choose stars to use for performing astrometry.')
 
-    add('--doobslog', dest='doobslog', action='store_true',
-        help='Create an observing log without going through the full reduction.')
+    add('--logfile', dest='logfile', default='log.txt',
+        help='Name of the file which contains all print statements from the \
+            pipeline.')
 
     add('--dooverwrite', dest='dooverwrite', default=False,
         help='Overwrites any existing files. Default: False')
@@ -374,7 +379,7 @@ def update_trimsec(trimsec):
     """
     There are more bad columns in ccd1 than the header says.
 
-    So this function changes one of the trimsec x values by 3 pixels so that
+    This function changes one of the trimsec x values by 3 pixels so that
     these columns will be removed.
 
     Parameters
@@ -401,13 +406,7 @@ def update_trimsec(trimsec):
 
 def createMaster(full_flist, frametype, nccd, mbias, gain, rdnoise, outputdir,
                  name, filt, log_fname):
-    """Given list of files, create Master bias or flat.
-
-    Usage:
-    mflat, flatname = gtcsetup.createMaster(ff, 'flat', nccd, mbias,
-                                        gain, rdnoise,
-                                        args.outputdir,
-                                        args.flatfile, filt)
+    """Given list of files, median combine them to create a master file.
 
     Parameters
     ----------
@@ -448,12 +447,15 @@ def createMaster(full_flist, frametype, nccd, mbias, gain, rdnoise, outputdir,
     # Add filter to filename if necessary
     fname = name+add+'.fits'
 
+    all_exps = []
     # Go through each file, process it, write out as temp file
     for j, f in enumerate(flist):
         # os.system("tar -xzf {}".format(f))
         # f=f.replace('.gz','')
         with fits.open(f) as fits_open:
             hdr = fits_open[0].header
+            exp = hdr['EXPTIME']
+            all_exps.append(exp)
 
         # Read in raw data for both ccds
         raw = [CCDData.read(f, hdu=x+1, unit='adu') for x in range(nccd)]
@@ -483,17 +485,67 @@ def createMaster(full_flist, frametype, nccd, mbias, gain, rdnoise, outputdir,
     tmp = glob('tmpfile*fits')
 
     print_both(log_fname, '   Combining processed', frametype, ' files')
-    # Note: Nora also had these values, I didn't change them
-    master = [ccdproc.combine(tmp, hdu=x+1, unit=u.electron, method='median',
-                              sigma_clip=True, sigma_clip_low_thresh=5,
-                              sigma_clip_high_thresh=5,
-                              sigma_clip_func=np.ma.median) for x in range(nccd)]
 
     # Normalize the flat if creating master flat
     if frametype == 'flat':
+        # if maskflat is True:
+        #     master = []
+        #     for ccd in range(nccd):
+        #         all_masked_images = []
+
+        #         for i, f in enumerate(tmp):
+        #             tmp_fits = [CCDData.read(f, hdu=x+1, unit='adu', memmap=False)
+        #                         for x in range(nccd)]
+        #             tmp_fits[ccd].data /= all_exps[i]
+
+        #             # tmp_fits = [
+        #             #     x.data.divide(all_exps[i]*u.second, handle_meta='first found') for x in tmp_fits_init]
+        #             # sci_final = [[x.divide(all_headers[i][0]['EXPTIME']*u.second,
+        #             #                        propagate_uncertainties=True,
+        #             #                        handle_meta='first_found')
+        #             # for i, x in enumerate(imgs)] for imgs in sky_sub]
+
+        #             mask = make_source_mask(tmp_fits[ccd].data, nsigma=3, npixels=3)
+
+        #             new_hdul = fits.HDUList(fits.PrimaryHDU(header=hdr))
+        #             new_hdul.append(fits.ImageHDU(data=mask.astype(int), header=hdr))
+        #             new_hdul.writeto(outputdir+fname[:-5]+'_mask' +
+        #                              '_ccd'+str(ccd)+'.fits', overwrite=True)
+
+        #             # mask out the stars in the flats before median combining
+        #             # sometimes they're very close to the background value that
+        #             # sigma clipping does not remove them
+        #             masked_img = CCDData(tmp_fits[ccd].data,  # mask=mask,
+        #                                  header=tmp_fits[ccd].header, unit='adu')
+        #             all_masked_images.append(masked_img)
+
+        #         masked_median_img = ccdproc.combine(all_masked_images,
+        #                                             method='median')
+        #         master.append(masked_median_img)
+
+        #     print(master[0].header)
+        #     print(master[1].header)
+
+        master = [ccdproc.combine(tmp, hdu=x+1, unit=u.electron, method='median',
+                                  sigma_clip=True, sigma_clip_low_thresh=5,
+                                  sigma_clip_high_thresh=5,
+                                  sigma_clip_func=np.ma.median) for x in range(nccd)]
+
         print_both(log_fname, 'Normalizing flat')
         for i, x in enumerate(master):
-            master[i].data /= master[i].data.max()
+            # print(master[i].data.max)
+            # print(np.nanmax(master[i].data))
+            # print(master[i].data)
+            master[i].data /= np.nanmax(master[i].data)  # master[i].data.max()
+
+    else:
+        # Note: Nora also had these values, I didn't change them
+        # everything above/below 5 sigma will be clipped
+        # if you increase to 10 sigma, then less will be clipped
+        master = [ccdproc.combine(tmp, hdu=x+1, unit=u.electron, method='median',
+                                  sigma_clip=True, sigma_clip_low_thresh=5,
+                                  sigma_clip_high_thresh=5,
+                                  sigma_clip_func=np.ma.median) for x in range(nccd)]
 
     # Write out the master flat or bias file
     master_hdu = fits.HDUList([fits.PrimaryHDU(header=hdr)])
@@ -572,8 +624,10 @@ def write_one_image(hdr, hdrs, sci_final, outputdir, imafile, root, filt,
     -------
     None
     """
+    # Not sure why I chose these values
     sig_clip_low = 5
     sig_clip_high = 5
+
     # NOTE: sigma clipping is getting rid of vertical streaks in the science
     # images that are not in the master flat which is what the bad pixel mask
     # is based on
@@ -635,51 +689,6 @@ def write_ccd(hdr, hdrs, sci_final, outputdir, imafile, root, filt, log_fname):
                '_'+root+filt+'_ccd 1 and 2 .fits')
 
 
-def combine_files(outputdir, root, filt, diag_path, use_slash, log_fname):
-    """Median combine a list of images.
-
-    Parameters
-    ----------
-    outputdir (str) : directory files will be written to
-    root (str) : contains object name
-    filt (str) : filter of the images
-
-    Returns
-    -------
-    None
-    """
-    # Get list of files to combine
-    combine_list = [outputdir+o for o in os.listdir(outputdir)
-                    if o.endswith(root+filt+'_ccd1.fits')]
-    print_both(log_fname, '    combining files for ccd1:', combine_list)
-
-    # Median combine files with ccdproc
-    ima = ccdproc.combine(combine_list, method='median', sigma_clip=True,
-                          sigma_clip_func=np.ma.median, unit='adu')
-
-    # Write out the files
-    ima.write(outputdir+root+filt+'_final_ccd1.fits', overwrite=True)
-
-    # move files to diagnostic dir
-    for c in combine_list:
-        fname = c.split(use_slash)[-1]
-        shutil.move(c, diag_path+fname)
-
-    combine_list = [outputdir+o for o in os.listdir(outputdir)
-                    if o.endswith(root+filt+'_ccd2.fits')]
-
-    print_both(log_fname, '    combining files for ccd2', combine_list)
-
-    ima = ccdproc.combine(combine_list, method='median', sigma_clip=True,
-                          sigma_clip_func=np.ma.median, unit='adu')
-
-    ima.write(outputdir+root+filt+'_final_ccd2.fits', overwrite=True)
-
-    for c in combine_list:
-        fname = c.split(use_slash)[-1]
-        shutil.move(c, diag_path+fname)
-
-
 def get_header_info(obj, filt):
     """Test."""
     all_filts = []
@@ -730,3 +739,27 @@ def read_in_files(path, root, log_fname):
     else:
         print_both(log_fname, 'FOLDER DOES NOT EXIST:', path)
         return []
+
+
+def save_times(tstart, tnow, action, text, times, actions, log_fname):
+    """Test."""
+    print_both(log_fname, 'Time after '+text,
+               (tnow-tstart)/60., 'min')
+    times.append((tnow-tstart)/60.)
+    actions.append(action)
+
+    return times, actions
+
+
+def print_pipeline_times(times, actions, log_fname):
+    """Test."""
+    print(times, actions)
+
+    print_both(log_fname, 'Action   Time to complete Action    Total pipeline time')
+    for i in range(len(actions)):
+        if i == 0:
+            print_both(log_fname, actions[i], '-', round(
+                times[i], 4))
+        else:
+            print_both(log_fname, actions[i], round(times[i]-times[i-1], 4),
+                       round(times[i], 4))

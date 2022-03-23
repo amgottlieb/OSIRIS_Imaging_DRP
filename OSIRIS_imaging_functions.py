@@ -25,6 +25,52 @@ import copy
 
 import OSIRIS_imaging_setup as gtcsetup
 
+# Variables the user may want to change
+
+# parameters in detect_cosmics
+
+# cutoff is used in calc_astrometry_accuracy around line 960
+# separations between OSIRIS objects and GAIA stars that are less than this
+# are considered good
+cutoff = 2  # arcsec
+
+# pad is used in do_stacking around line 1050
+# it is the number of rows/columns to add onto each side of the image before
+# aligning and combining (in pixels)
+pad = 200
+
+# ellipse_lim is used in get_osiris_obj_cat around line 700
+# objects with ellipticities less than this will be included in the
+# OSIRIS detected object catalog/for astrometry
+ellipse_lim = 1.
+
+# patch_radius is used in plot_images and plot_check_images
+# has units of pixels
+patch_radius = 5
+
+# the remaining varibles are used in do_interactive_astrometry around line 800
+
+# default is same as patch radius;
+# as long as you click within the circle, this should be fine
+cross_match_r = patch_radius
+
+# pix_limit determines how close to the edge of the image stars can be;
+# stars at pixel values less than this will not be included in the catalog/for
+# astrometry
+pix_limit = 0
+
+#  n_stars determines how many of the brightest stars (n_stars) will
+# be displayed when doing interactive photometry.
+n_stars_init = 40
+
+# select_n_stars is the minimum number of stars you must choose when doing
+# interactive astrometry. Absolute minimum should be 3, 6 is sufficient,
+# but you can choose as many as you want
+select_n_stars = 6
+
+# sip_deg determines the distortion correciton
+sip_deg = 2
+
 
 def do_calib(obj, filt, log_fname, nccd, mbias, mflat, mask_ccd, gain,
              rdnoise, calib_path, bpm_path, root):
@@ -189,7 +235,7 @@ def do_crmask(log_fname, all_sci_calib, mask_ccd, gain, rdnoise, saturation,
                                  f[:-5]+'_CRmask_applied.fits', root,
                                  filt, log_fname, nccd)
 
-    return all_sci_proc  # , cr_mask_ccd
+    return all_sci_proc
 
 
 #############################################################################
@@ -324,8 +370,8 @@ def do_bkg_sky_subtraction(all_sci_proc, all_headers, log_fname,
         # median combine the images where stars have been masked out
         # and background has been subtracted (sky image) for 1 ccd
 
-        masked_median_img = ccdproc.combine(
-            all_masked_bkg_sub_images, method='median')
+        masked_median_img = ccdproc.combine(all_masked_bkg_sub_images,
+                                            method='median')
 
         sci_skymap.append(masked_median_img)
         all_bkg_sub_images.append(bkg_sub_images)
@@ -435,21 +481,19 @@ def plot_images(img, ref_img, w, ref_wcs, sky, tbl_crds, obj_ra,
     """Test."""
     font_prop = font_manager.FontProperties(size=14)
 
-    fig = plt.figure(figsize=(12, 10))
+    fig = plt.figure(figsize=(12, 12))
     ax = fig.add_subplot(121, projection=w)
-    # ax = plt.subplot(projection=w)
-    ax.set_xlabel("RA", fontproperties=font_prop)  # INCREASE SIZE
-    ax.set_ylabel("Dec", fontproperties=font_prop)  # INCREASE SIZE
+    ax.set_xlabel("RA", fontproperties=font_prop)
+    ax.set_ylabel("Dec", fontproperties=font_prop)
 
-    # ax2 = fig.add_axes([0.5, 0.1, 0.45, 0.8], projection=w)
     ax.imshow(img, origin='lower', cmap='gray', vmin=np.nanmean(
         img)-np.nanstd(img), vmax=np.nanmean(img)+np.nanstd(img))
 
     if select == 'gaia':
         for j in range(len(tbl_crds.ra)):
             x, y = w.all_world2pix(tbl_crds.ra.deg[j], tbl_crds.dec.deg[j], 0)
-            ax.add_patch(patches.Circle((x, y), radius=5, ec='b', fc='none',
-                                        lw=2, alpha=0.8,
+            ax.add_patch(patches.Circle((x, y), radius=patch_radius, ec='b',
+                                        fc='none', lw=2, alpha=0.8,
                                         label='Reference: RA = %f, Dec = %f' %
                                         (tbl_crds.ra.deg[j], tbl_crds.dec.deg[j]),
                                         picker=True))
@@ -460,8 +504,8 @@ def plot_images(img, ref_img, w, ref_wcs, sky, tbl_crds, obj_ra,
     if select == 'osiris':
         for j in range(len(obj_ra[:n_stars])):
             x, y = w.all_world2pix(obj_ra[j], obj_dec[j], 0)
-            ax.add_patch(patches.Circle((x, y), radius=5, ec='k', fc='none',
-                                        lw=2, alpha=0.8,
+            ax.add_patch(patches.Circle((x, y), radius=patch_radius, ec='k',
+                                        fc='none', lw=2, alpha=0.8,
                                         label='Position: x = %f, y = %f' %
                                         (x, y), picker=True))
     else:
@@ -472,14 +516,14 @@ def plot_images(img, ref_img, w, ref_wcs, sky, tbl_crds, obj_ra,
     for i, p in enumerate(pts):
         ax.text(p[0], p[1], str(i+1), c='magenta', fontsize='large')
 
-    ax.set_title('Your OSIRIS image', fontproperties=font_prop)  # INCREASE SIZE
+    ax.set_title('Your OSIRIS image', fontproperties=font_prop)
     all_patches = ax.patches
 
     #########################
 
     ax2 = fig.add_subplot(122, projection=ref_wcs)
-    ax2.set_xlabel("RA", fontproperties=font_prop)  # INCREASE SIZE
-    ax2.set_ylabel("Dec", fontproperties=font_prop)  # INCREASE SIZE
+    ax2.set_xlabel("RA", fontproperties=font_prop)
+    ax2.set_ylabel("Dec", fontproperties=font_prop)
 
     ref = ref_img[0].data
     ax2.imshow(ref, origin='lower', cmap='gray', vmin=np.nanmean(
@@ -491,8 +535,8 @@ def plot_images(img, ref_img, w, ref_wcs, sky, tbl_crds, obj_ra,
              transform=ax2.get_transform('fk5'), mec='k', mfc='none',
              label='OSIRIS')
 
-    ax2.set_title('SDSS zband image for reference',
-                  fontproperties=font_prop)  # INCREASE SIZE
+    ax2.set_title('SDSS image for reference',
+                  fontproperties=font_prop)
 
     plt.legend()
 
@@ -504,11 +548,13 @@ def select_points(img, select_n_stars, color):
     while True:
         pts = []
         while len(pts) < select_n_stars:
-            tellme('Right click to select 6 '+color +
-                   ' stars on the LEFT plot;\n'
+            tellme('Right click inside a '+color+' circle to select at least ' +
+                   str(select_n_stars) +
+                   ' stars on the LEFT plot. \n'
+                   ' Use the magnifying glass to zoom in.\n'
                    'To remove a selected star, '
                    'click the back button on your mouse. \n'
-                   'press enter when done.')
+                   'Press enter when done.')
 
             pts = np.asarray(plt.ginput(-1, timeout=-1,
                                         mouse_add=MouseButton(3),
@@ -524,13 +570,7 @@ def select_points(img, select_n_stars, color):
             img)-np.nanstd(img), vmax=np.nanmean(img)+np.nanstd(img))
         plt.plot(np.array(pts).T[0], np.array(pts).T[1], 'o', c='orange')
 
-        # plt.plot(np.array(pts2).T[0],np.array(pts2).T[1],'o',label='GAIA')
-        # print(pts)
-
-        # tellme('Happy? Press y for yes, n for no.')
         tellme('Happy? Key click for yes, mouse click for no')
-
-        # val = check_if_done()
 
         if plt.waitforbuttonpress():
             break
@@ -558,22 +598,10 @@ def select_yes_no(img, select_n_stars):
                 tellme('Too few points, starting over')
                 time.sleep(1)  # Wait a second
 
-        # check_fig = plt.figure()
-        # plt.imshow(img, origin='lower', cmap='gray', vmin=np.nanmean(
-        #     img)-np.nanstd(img), vmax=np.nanmean(img)+np.nanstd(img))
-        # plt.plot(np.array(pts).T[0], np.array(pts).T[1], 'o', c='orange')
-
-        # # plt.plot(np.array(pts2).T[0],np.array(pts2).T[1],'o',label='GAIA')
-        # # print(pts)
-
-        # # tellme('Happy? Press y for yes, n for no.')
-        # tellme('Happy? Key click for yes, mouse click for no')
-
-        # val = check_if_done()
+        tellme('Happy? Key click for yes, mouse click for no')
 
         if plt.waitforbuttonpress():
             break
-            # check_fig.close()
 
     return pts
 
@@ -583,9 +611,8 @@ def plot_check_img(img, final_wcs, tbl_crds):
     font_prop = font_manager.FontProperties(size=14)
 
     fig3 = plt.figure(figsize=(12, 10))
-    # letter = fig3.canvas.mpl_connect('key_press_event', press)
 
-    ax = fig3.add_subplot(121)  # , projection=final_wcs)
+    ax = fig3.add_subplot(121)
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
 
@@ -598,13 +625,12 @@ def plot_check_img(img, final_wcs, tbl_crds):
 
     ax.text(x1, y, 'YES', c='g')
     ax.text(x2, y, 'NO', c='g')
-    # xs = [x1, x2]
 
-    ax.add_patch(patches.Circle((x1, y), radius=5, ec='k', fc='none',
+    ax.add_patch(patches.Circle((x1, y), radius=patch_radius*2, ec='k', fc='none',
                                 lw=2, alpha=0.8,
                                 label='Position: x = %f, y = %f' %
                                 (x1, y), picker=True))
-    ax.add_patch(patches.Circle((x2, y), radius=5, ec='k', fc='none',
+    ax.add_patch(patches.Circle((x2, y), radius=patch_radius*2, ec='k', fc='none',
                                 lw=2, alpha=0.8,
                                 label='Position: x = %f, y = %f' %
                                 (x2, y), picker=True))
@@ -613,8 +639,8 @@ def plot_check_img(img, final_wcs, tbl_crds):
     #########################
 
     ax2 = fig3.add_subplot(122, projection=final_wcs)
-    ax2.set_xlabel("RA", fontproperties=font_prop)  # INCREASE SIZE
-    ax2.set_ylabel("Dec", fontproperties=font_prop)  # INCREASE SIZE
+    ax2.set_xlabel("RA", fontproperties=font_prop)
+    ax2.set_ylabel("Dec", fontproperties=font_prop)
 
     ax2.imshow(img, origin='lower', cmap='gray', vmin=np.nanmean(
         img)-np.nanstd(img), vmax=np.nanmean(img)+np.nanstd(img))
@@ -622,7 +648,7 @@ def plot_check_img(img, final_wcs, tbl_crds):
              mec='b', mfc='none', label='GAIA')
 
     # ax2.set_title('SDSS zband image for reference',
-    #               fontproperties=font_prop)  # INCREASE SIZE
+    #               fontproperties=font_prop)
 
     # plt.legend()
 
@@ -631,15 +657,6 @@ def plot_check_img(img, final_wcs, tbl_crds):
 
 def get_gaia_img_cat(img, pix_limit, w, sky, log_fname):
     """Test."""
-    ######################################
-    # Get gaia comparison catalog centered on ccd
-    # using cone with radius 6 arcmin (Nora chose this)
-    # NOTE: radius of 6 gives circle, larger radius gives
-    # weird shape that doesn't cover the ccd...
-    # gaia = Irsa.query_region(SkyCoord(sky.ra, sky.dec, frame='fk5'),
-    #                          catalog="gaia_dr2_source", spatial="Cone",
-    #                          radius=6*u.arcmin)
-
     # Getting corners of the ccd to select only stars that are actually in the
     # image
     pairs = [(pix_limit, pix_limit), (pix_limit, img.shape[0]-pix_limit),
@@ -670,11 +687,10 @@ def get_gaia_img_cat(img, pix_limit, w, sky, log_fname):
         if not np.isnan(gaia_flux_init[i]):  # == False:
             gaia_ind.append(i)
     gaia_ind = np.array(gaia_ind)
-    # print(gaia_ind)
-    # print(gaia_flux_init)
 
     # gaia_fluxes = gaia_flux_init[gaia_ind]
     # print(gaia_fluxes)
+
     tbl_crds = coordinates.SkyCoord(gaia['ra'][gaia_ind], gaia['dec'][gaia_ind],
                                     unit=(u.deg, u.deg), frame='fk5')
 
@@ -697,10 +713,12 @@ def get_osiris_obj_cat(img, fname, w, pix_limit, log_fname):
                         'objects remain after removing those with flags')
 
     # check how circular/ellipsoidal;
-    # ****not currently used to remove objects
     axes_diff = np.array([round(abs(objects['a'][i]-objects['b'][i]), 3)
                           for i in range(len(objects))])
-    # print(axes_diff)
+    # ellipse_lim = 1.
+    sorted_axes = np.array([x for _, x in sorted(
+        zip(objects['flux'], axes_diff))])[::-1]
+    # print(len(good))
 
     # Sort x and y based on the flux; we want to take the n brightest stars
     # sorted_flux = np.array(sorted(objects['flux'])[::-1])
@@ -709,17 +727,19 @@ def get_osiris_obj_cat(img, fname, w, pix_limit, log_fname):
     sorted_y = np.array([x for _, x in sorted(
         zip(objects['flux'], objects['y']))])[::-1]
 
-    # Eliminate stars that are close to the edge
+    # Eliminate stars that are close to the edge AND too elliptical
     # pix_limit is how much of the edge of the ccd to exclude
     final_x = []
     final_y = []
     for i in range(len(sorted_x)):
         x = sorted_x[i]
         y = sorted_y[i]
+        e = sorted_axes[i]
         if x > pix_limit and (x < img.shape[1]-pix_limit) and (
                 y > pix_limit) and (y < img.shape[0]-pix_limit):
-            final_x.append(x)
-            final_y.append(y)
+            if e < ellipse_lim:
+                final_x.append(x)
+                final_y.append(y)
     final_x = np.array(final_x)
     final_y = np.array(final_y)
 
@@ -736,8 +756,6 @@ def get_osiris_obj_cat(img, fname, w, pix_limit, log_fname):
         obj_dec.append(pos[1])
     obj_ra = np.array(obj_ra)
     obj_dec = np.array(obj_dec)
-    # print(obj_ra)
-    # print(obj_dec)
 
     return obj_ra, obj_dec, final_x, final_y
 
@@ -752,12 +770,12 @@ def cross_match(all_patches, selected_pts, radius):
     """Test."""
     final_pts = []
     for pt in selected_pts:
-        print('Pt', pt)
+        # print('Pt', pt)
         for patch in all_patches:
             p_cen = patch.center
             incirc = in_circle(p_cen[0], p_cen[1], radius, pt[0], pt[1])
             if incirc:
-                print('found')
+                # print('found')
                 final_pts.append([patch.center[0], patch.center[1]])
                 break
     return np.array(final_pts)
@@ -768,21 +786,17 @@ def final_check(img, final_wcs, tbl_crds, log_fname):
     # Plot the OSIRIS image with the new wcs and overplot Gaia points to make
     # sure astrometry is good; user selects yes or no
     fig3, all_patches = plot_check_img(img, final_wcs, tbl_crds)
-    text = 'Right click to select yes or no'
+    text = 'Right click inside a GREEN circle to select yes or no.'
     tellme(text)
     plt.waitforbuttonpress()
 
-    select_n_stars = 1
-    selected_pts = select_yes_no(img, select_n_stars)
+    selected_pts = select_points(img, 1, 'GREEN')
     # print(selected_pts)
 
     # CROSS MATCH SELECTED POINTS WITH ALL PATCHES
-    final_pts = cross_match(all_patches, selected_pts, 5)
+    final_pts = cross_match(all_patches, selected_pts, patch_radius*2)
 
-    # print(final_pts)
-    # print(img.shape)
     plt.close(fig3)
-    # print('------------')
 
     if len(final_pts) == 0:
         gtcsetup.print_both(log_fname, 'Invalid selection; try again')
@@ -820,22 +834,21 @@ def do_interactive_astrometry(final_name, fname, full_filt, ccd, astrom_path,
     but other stars may not. Therefore, it seems best to choose as many stars
     as possible
 
-    Note: Things the user may want to change
+    Note: Things the user may want to change at the very top
         - pix_limit
-        - obj_frac
         - n_stars
         - select_n_stars
         - sip_deg
 
 
-    NOTE TO SELF*** ADD IN FILTER**** ADD ELLIPTICITY CHECK ***
+    NOTE TO SELF*** ADD ELLIPTICITY CHECK ***
 
     Parameters
     ----------
     final_name (str) : the name to write the corrected image to
     fname (str) : the name of the image to perform astrometry on (will be 1 ccd)
     full_filt (str) : the current filter (ex: Sloan_z)
-    ccd 
+    ccd (?)
     astrom_path
     log_fname (?) : log file to append print statements to
 
@@ -855,7 +868,7 @@ def do_interactive_astrometry(final_name, fname, full_filt, ccd, astrom_path,
     sky = w.pixel_to_world(img.shape[1]/2, img.shape[0]/2)
     gtcsetup.print_both(log_fname, 'Center of ccd:', sky.ra.deg, sky.dec.deg)
 
-    pix_limit = 0
+    # pix_limit = 0
     # Detect sources in the OSIRIS image and convert x/y to ra/dec using the
     # original wcs information
     obj_ra, obj_dec, final_x, final_y = get_osiris_obj_cat(img, fname, w,
@@ -865,17 +878,22 @@ def do_interactive_astrometry(final_name, fname, full_filt, ccd, astrom_path,
     tbl_crds = get_gaia_img_cat(img, pix_limit, w, sky, log_fname)
 
     # Set how many OSIRIS stars should be displayed for astrometry
-    obj_frac = 4
-    n_stars = round(len(obj_ra)/obj_frac)
-    # print(n_stars)
-    n_stars = 40
+    # n_stars = 40
+    n_stars = min(n_stars_init, len(obj_ra))
 
-    # Get sdss image for testing purposes
+    # Get sdss image to compare to OSIRIS image
     ref_img = SkyView.get_images(position=str(sky.ra.deg)+','+str(sky.dec.deg),
                                  # survey='SDSSz',
                                  survey='SDSS'+filt,
                                  coordinates='J2000',
-                                 pixels=str(img.shape[1])+','+str(img.shape[0]))[0]
+                                 pixels=str(img.shape[1])+','+str(img.shape[0]))
+    if len(ref_img) == 0:
+        ref_img = SkyView.get_images(position=str(sky.ra.deg)+','+str(sky.dec.deg),
+                                     survey='DSS',
+                                     coordinates='J2000',
+                                     pixels=str(img.shape[1])+','+str(img.shape[0]))
+    print(ref_img)
+    ref_img = ref_img[0]
     # Get wcs information from SDSS image
     ref_wcs = wcs.WCS(ref_img[0].header)
 
@@ -885,18 +903,18 @@ def do_interactive_astrometry(final_name, fname, full_filt, ccd, astrom_path,
                                             obj_ra, obj_dec, n_stars, [], 'osiris')
 
     # Wait for user to select at least n points
-    select_n_stars = 6
+    # select_n_stars = 6
     text = 'You will select '+str(select_n_stars)+' BLACK (OSIRIS) stars first.\n' \
         'Then you will select the corresponding Gaia stars (in blue) in the' \
         'same order. \n To remove a selected star, click the back button' \
-        ' on your mouse.'
+        ' on your mouse. Click anywhere to begin.'
     tellme(text)
     plt.waitforbuttonpress()
     # Points selected by user
     pts = select_points(img, select_n_stars, 'BLACK')
 
     # Cross match where the user selected with the actual positions of the stars
-    source_xy = cross_match(all_patches, pts, 5)
+    source_xy = cross_match(all_patches, pts, cross_match_r)
 
     plt.close(fig)
 
@@ -907,12 +925,13 @@ def do_interactive_astrometry(final_name, fname, full_filt, ccd, astrom_path,
                                                n_stars, pts, 'gaia')
 
     # Wait for user to select at least n points
-    tellme('You will select 6 BLUE (gaia) stars in the same order (green numbers). ')
+    tellme('You will now select 6 BLUE (gaia) stars in the same order (pink numbers).'
+           'Click anywhere to begin.')
     plt.waitforbuttonpress()
     pts2 = select_points(img, select_n_stars, 'BLUE')
 
     # Cross match where the user selected with the actual positions of the stars
-    final_pts2 = cross_match(all_patches2, pts2, 5)
+    final_pts2 = cross_match(all_patches2, pts2, cross_match_r)
     plt.close(fig2)
 
     # Convert x/y to ra/dec using OSIRIS image wcs info
@@ -923,7 +942,7 @@ def do_interactive_astrometry(final_name, fname, full_filt, ccd, astrom_path,
     coords = SkyCoord(np.array(ref_radec), frame='fk5', unit='deg')
 
     # Calculate new wcs
-    sip_deg = 2
+    # sip_deg = 2
     new_wcs = fit_wcs_from_points(xy=source_xy.T, world_coords=coords,
                                   projection='TAN', sip_degree=sip_deg)
 
@@ -941,7 +960,7 @@ def do_interactive_astrometry(final_name, fname, full_filt, ccd, astrom_path,
     answer = final_check(img, final_wcs, tbl_crds, log_fname)
 
     calc_astrometry_accuracy(img, final_wcs, final_x, final_y, tbl_crds, astrom_path,
-                             ccd, log_fname)
+                             ccd, final_name, log_fname)
 
     if answer == 'no':
         gtcsetup.print_both(log_fname, 'REDOING ASTROMETRY ')
@@ -958,7 +977,7 @@ def do_interactive_astrometry(final_name, fname, full_filt, ccd, astrom_path,
 
 
 def calc_astrometry_accuracy(img, final_wcs, final_x, final_y, tbl_crds, astrom_path,
-                             ccd, log_fname):
+                             ccd, final_name, log_fname):
     """Test."""
     font_prop = font_manager.FontProperties(size=14)
 
@@ -976,16 +995,15 @@ def calc_astrometry_accuracy(img, final_wcs, final_x, final_y, tbl_crds, astrom_
 
     idx, d2d, d3d = obj_crds.match_to_catalog_sky(tbl_crds)
 
-    cutoff = 2  # arcsec
+    # cutoff = 2  # arcsec
     good = np.where(d2d.arcsec < cutoff)[0]
 
     fig = plt.figure(figsize=(12, 14))
-    # letter = fig3.canvas.mpl_connect('key_press_event', press)
-
     ax = fig.add_subplot(121, projection=final_wcs)
     ax.set_xlabel("RA", fontproperties=font_prop)
     ax.set_ylabel("Dec", fontproperties=font_prop)
     ax.set_title("CCD"+ccd, fontproperties=font_prop)
+
     ax.imshow(img, origin='lower', cmap='gray', vmin=np.nanmean(
         img)-np.nanstd(img), vmax=np.nanmean(img)+np.nanstd(img))
     ax.plot(obj_ra[good], obj_dec[good], '.', transform=ax.get_transform('fk5'),
@@ -1003,7 +1021,10 @@ def calc_astrometry_accuracy(img, final_wcs, final_x, final_y, tbl_crds, astrom_
         np.median(d2d[good].arcsec), 6))+'arcsec',
         fontproperties=font_prop)
 
-    plt.savefig(astrom_path+'astrometry_accuracy_ccd'+ccd+'.png')
+    plt.savefig(astrom_path+final_name.split('/')
+                [-1][:-5]+'_astrometry_accuracy_ccd'+ccd+'.png')
+    plt.suptitle(
+        'Click q four times or close all plots to continue with pipeline reduction.')
     plt.show()
 
 
@@ -1020,30 +1041,57 @@ def crop_padding(img):
     """
     ymax, xmax = img.shape
 
+    # test_img = copy.deepcopy(img)
+    # test_img[np.isnan(test_img)] = -10000
+    # plt.figure()
+    # plt.imshow(img, origin='lower', interpolation='none', vmin=np.nanmean(
+    #     img)-np.nanstd(img), vmax=np.nanmean(img)+np.nanstd(img))
+    # plt.show()
+
+    # print(img.shape)
+
     # Calculate the sum of all rows
-    xsums = np.sum(img, axis=0)
+    xsums = np.nansum(img, axis=0)
     # Get the indices where the sum equals zero
     xinds = np.where(xsums == 0)[0]
+    # print('xinds', len(xinds), xinds)
     # Subtract the indices from eachother (ex: [1,2,3,5] -> [1,1,2])
     xdiffs = np.diff(xinds)
+    # print('xdiffs', xdiffs)
     # Find where there is a large jump in index (ex: [1,2,3,1000,1001,1002])
-    final_xind = np.where(xdiffs > 1)[0]
-    # This is the beginning/end of the actual data
-    x1 = xinds[final_xind][0]
-    x2 = xinds[final_xind+1][0]
+    final_xind = np.where(xdiffs > 100)[0][0]
+    # print(final_xind)
+    # print(xinds[final_xind])
+    # This is the beginning/end of the actual data ex: x1=4, x2=999
+    x1 = xinds[final_xind]
+    x2 = xinds[final_xind+1]
 
     # Repeat for columns
-    ysums = np.sum(img, axis=1)
+    ysums = np.nansum(img, axis=1)
     yinds = np.where(ysums == 0)[0]
+    # print(yinds)
     ydiffs = np.diff(yinds)
-    final_yind = np.where(ydiffs > 1)[0]
-    y1 = yinds[final_yind][0]
-    y2 = yinds[final_yind+1][0]
+    # print(ydiffs)
+    final_yind = np.where(ydiffs > 100)[0][0]
+    # print(final_yind)
+    y1 = yinds[final_yind]
+    y2 = yinds[final_yind+1]
 
+    # x1 = 198
+    # x2 = 1046
+    # y1 = 122
+    # y2 = 2050
+    # print('x/y', x1, x2, y1, y2)
     # Select the part of the image that contains data and not all zeros
     cropped_img = img[y1:y2, x1:x2]
+    # print(cropped_img.shape)
 
-    return cropped_img
+    # plt.figure()
+    # plt.imshow(cropped_img, origin='lower', interpolation='none',
+    #            vmin=np.nanmean(img)-np.nanstd(img), vmax=np.nanmean(img)+np.nanstd(img))
+    # plt.show()
+
+    return cropped_img, x1, y1
 
 
 def do_stacking(sci_final, all_headers, args, root, filt, astrom_path, log_fname):
@@ -1060,8 +1108,12 @@ def do_stacking(sci_final, all_headers, args, root, filt, astrom_path, log_fname
 
     # Loop through each ccd so that at the end of the loop we can combine
     # all the images in one ccd
+    padded_final_aligned_image = []
     final_aligned_image = []
+    all_aligned_images = []
     footprints = []
+    padding = ((pad, pad), (pad, pad))
+    constant_vals = ((np.nan, np.nan), (np.nan, np.nan))
     for ccd in range(len(sci_final[0])):
 
         gtcsetup.print_both(log_fname, '     CCD', ccd+1)
@@ -1079,11 +1131,10 @@ def do_stacking(sci_final, all_headers, args, root, filt, astrom_path, log_fname
             if i == 0:
                 ref_imgs_init = np.array(image[ccd].data)
                 # ################# MAY NEED TO UPDATE ##############
-                pad = 200  # pixels checked GRB210704A, dithered by ~80 pix
+                # pad = 200  # pixels; checked GRB210704A, dithered by ~80 pix
                 ######################################
-                padding = ((pad, pad), (pad, pad))
                 ref_imgs = np.pad(ref_imgs_init, padding,
-                                  'constant', constant_values=0)
+                                  'constant', constant_values=constant_vals)
                 aligned_images.append(ref_imgs)
 
                 # MOVE ON TO THE NEXT IMAGE
@@ -1091,10 +1142,10 @@ def do_stacking(sci_final, all_headers, args, root, filt, astrom_path, log_fname
 
             # Pad the image
             use_image_init = image[ccd].data
-            use_image = np.pad(use_image_init, padding,
-                               'constant', constant_values=(
-                                   (np.nan, np.nan), (np.nan, np.nan)))
 
+            use_image = np.pad(use_image_init, padding,
+                               'constant', constant_values=constant_vals)
+            # constant_values=((np.nan, np.nan), (np.nan, np.nan)))
             # Align the current image with the first reference image
             try:
                 img_aligned, footprint = aa.register(
@@ -1105,37 +1156,69 @@ def do_stacking(sci_final, all_headers, args, root, filt, astrom_path, log_fname
                     use_image.byteswap().newbyteorder(), ref_imgs,
                     propagate_mask=True, detection_sigma=3.0)
 
+            # plt.figure()
+            # plt.imshow(footprint*1, origin='lower')
+            # plt.show()
+
             # add the footprint image to an array
-            footprint_1ccd.append(footprint)
+            footprint_1ccd.append(np.array(footprint*10))
 
             # add the aligned image to an array
             aligned_images.append(np.array(img_aligned))
 
         # Median combine the aligned images for one ccd
         aligned_images = np.array(aligned_images)
+        all_aligned_images.append(aligned_images)
         median_aligned_img = np.nanmedian(aligned_images, axis=0)
+        padded_final_aligned_image.append(median_aligned_img)
 
         # Too many nans for ccdproc.combine? so I used numpy instead
         # median_aligned_img = ccdproc.combine(aligned_images,
         #                       method='median')
 
         # Crop out the padding in the median combined image
-        cropped_img = crop_padding(median_aligned_img)
+        cropped_img1, x1, y1 = crop_padding(median_aligned_img)
 
-        # Append the final aligned image as a CCDData object to be
-        # written later
-        final_aligned_image.append(CCDData(cropped_img, unit='electron'))
-        footprints.append(footprint_1ccd)
+        all_headers[0][ccd +
+                       1]['CRPIX1'] = float(all_headers[0][ccd+1]['CRPIX1'])+float(x1)
+        all_headers[0][ccd +
+                       1]['CRPIX2'] = float(all_headers[0][ccd+1]['CRPIX2'])+float(y1)
+
+        cropped_img = median_aligned_img
+        # gtcsetup.write_ccd(all_headers[i][0], all_headers[i][1:],
+        #                    [CCDData(cropped_img, unit='electron'),
+        #                     CCDData(cropped_img, unit='electron')], astrom_path,
+        #                    'cropped_aligned'+str(i+1)+'_ccd'+str(ccd+1)+'.fits',
+        #                    root, filt, log_fname)
+        # print(cropped_img.shape)
+        # Append the final aligned image as to be written later
+
+        # CCDData(cropped_img, unit='electron'))
+        final_aligned_image.append(cropped_img)
+
+        footprints.append(np.array(footprint_1ccd))
 
     # Write out the aligned/median combined images
     gtcsetup.write_ccd(all_headers[0][0], all_headers[0][1:],
-                       final_aligned_image, args.outputdir,
+                       [final_aligned_image[0], final_aligned_image[1]],
+                       args.outputdir,
                        'aligned.fits', root, filt, log_fname)
+
+    # gtcsetup.write_ccd(all_headers[0][0], all_headers[0][1:],
+    #                    padded_final_aligned_image, args.outputdir,
+    #                    'padded_aligned.fits', root, filt, log_fname)
+    # print(len(footprints), len(footprints[0]), len(footprints[0][0]))
 
     for i in range(len(footprint_1ccd)):
         gtcsetup.write_ccd(all_headers[i][0], all_headers[i][1:],
-                           footprints.T[i], astrom_path,
-                           'footprint.fits', root, filt, log_fname)
+                           [footprints[0][i], footprints[1][i]], astrom_path,
+                           'footprint'+str(i+1)+'.fits', root, filt, log_fname)
+
+    for i in range(len(footprint_1ccd)):
+        gtcsetup.write_ccd(all_headers[i][0], all_headers[i][1:],
+                           [all_aligned_images[0][i], all_aligned_images[1][i]],
+                           astrom_path,
+                           'pad_aligned'+str(i+1)+'.fits', root, filt, log_fname)
 
     return final_aligned_image
 
