@@ -68,7 +68,7 @@ n_stars_init = 40
 # but you can choose as many as you want
 select_n_stars = 6
 
-# sip_deg determines the distortion correciton
+# sip_deg determines the distortion correction
 sip_deg = 2
 
 
