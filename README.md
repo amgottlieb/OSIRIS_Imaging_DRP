@@ -36,7 +36,7 @@ If you are using the AnacondaPrompt3 and you get an error saying 'the following 
     
     %*"
     
-to the end of the text (the whole string should like like:
+to the end of the text so that the whole string should look like:
     
     "C:\Users\username\anaconda3\python.exe" "%1" %*"
 This allows Windows to pass all arguments to python.exe.
