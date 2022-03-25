@@ -690,7 +690,22 @@ def write_ccd(hdr, hdrs, sci_final, outputdir, imafile, root, filt, log_fname):
 
 
 def get_header_info(obj, filt):
-    """Test."""
+    """Get all headers and filters, and adjust the CRPIX keywords.
+
+    Also check which files match the current reduction filter.
+
+    Parameters
+    ----------
+    obj (list) : list of file names
+    filt (str) : current filter of the images (ex: Sloan_z)
+
+    Returns
+    -------
+    all_headers (list) : list of the headers from each of the 3 extensions
+    all_filts (list)   : list of True/False; True if the filter matches the
+                         current reduction filter
+
+    """
     all_filts = []
     all_headers = []
     for j, f in enumerate(obj):
@@ -722,7 +737,18 @@ def get_header_info(obj, filt):
 
 
 def read_in_files(path, root, log_fname):
-    """Test."""
+    """Read in the separate ccd1/2 files as CCDData objects.
+
+    Parameters
+    ----------
+    path (str) : full path to files
+    root (str) : contains object name
+    log_fname (str) : opened log file
+
+    Returns
+    -------
+    all_images (list) : list of pairs of images [[ccd1,ccd2], [ccd1,ccd2]...]
+    """
     all_images = []
     if os.path.isdir(path):
         ccd1 = [f for f in os.listdir(path) if root in f and 'ccd1' in f]
@@ -742,7 +768,23 @@ def read_in_files(path, root, log_fname):
 
 
 def save_times(tstart, tnow, action, text, times, actions, log_fname):
-    """Test."""
+    """Print out the current runtime; save it and the current reduction step.
+
+    Parameters
+    ----------
+    tstart (time/float) : time at the start of the reduction
+    tnow (time/float) : current time after completeing the current reduction step
+    action (str) : current reduction step
+    text (str) : statement about the current reduction step to print
+    times (list) : list of completion times of all previous reduction steps
+    actions (list) : list of completed reduction step names
+    log_fname (?) : opened log file
+
+    Returns
+    -------
+    times (list) : updated list of completion times of all previous reduction steps
+    actions (list) : updated list of completed reduction step names
+    """
     print_both(log_fname, 'Time after '+text,
                (tnow-tstart)/60., 'min')
     times.append((tnow-tstart)/60.)
@@ -752,7 +794,18 @@ def save_times(tstart, tnow, action, text, times, actions, log_fname):
 
 
 def print_pipeline_times(times, actions, log_fname):
-    """Test."""
+    """Print out each step and how long it took to run.
+
+    Parameters
+    ----------
+    times (list) : list of completion times of all reduction steps
+    actions (list) : list of completed reduction step names
+    log_fname (?) : opened log file
+
+    Returns
+    -------
+    None
+    """
     print(times, actions)
 
     print_both(log_fname, 'Action   Time to complete Action    Total pipeline time')

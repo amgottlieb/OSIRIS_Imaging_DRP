@@ -29,17 +29,17 @@ import OSIRIS_imaging_setup as gtcsetup
 
 # parameters in detect_cosmics
 
-# cutoff is used in calc_astrometry_accuracy around line 960
+# cutoff is used in calc_astrometry_accuracy around line 1190
 # separations between OSIRIS objects and GAIA stars that are less than this
 # are considered good
 cutoff = 2  # arcsec
 
-# pad is used in do_stacking around line 1050
+# pad is used in do_stacking around line 1325
 # it is the number of rows/columns to add onto each side of the image before
 # aligning and combining (in pixels)
 pad = 200
 
-# ellipse_lim is used in get_osiris_obj_cat around line 700
+# ellipse_lim is used in get_osiris_obj_cat around line 874
 # objects with ellipticities less than this will be included in the
 # OSIRIS detected object catalog/for astrometry
 ellipse_lim = 1.
@@ -48,7 +48,7 @@ ellipse_lim = 1.
 # has units of pixels
 patch_radius = 5
 
-# the remaining varibles are used in do_interactive_astrometry around line 800
+# the remaining varibles are used in do_interactive_astrometry around line 980
 
 # default is same as patch radius;
 # as long as you click within the circle, this should be fine
@@ -74,7 +74,30 @@ sip_deg = 2
 
 def do_calib(obj, filt, log_fname, nccd, mbias, mflat, mask_ccd, gain,
              rdnoise, calib_path, bpm_path, root):
-    """Test."""
+    """Apply bias, flat and bad pixel mask to science frames.
+
+    Parameters
+    ----------
+    obj (list) : list of file names
+    filt (str) : current filter of the images (ex: Sloan_z)
+    log_fname (str) : full path to log file
+    nccd (int) : 2 ccds for OSIRIS
+    mbias (array) : master bias [ccd1, ccd2]
+    mflat (array) : master flat [ccd1, ccd2]
+    mask_ccd (array) : master bad pixel mask [ccd1, ccd2]
+    gain (float) : instrument constant
+    rdnoise (float) : instrument constant
+    calib_path (str) : directory to write to bias/flat corrected images to
+    bpm_path (str) : directory to write to bias/flat/bpm corrected images to
+    root (str) : contains object name
+
+    Returns
+    -------
+    all_sci_proc (list): list of images after applying bias, flat, bpm and trimming
+    all_headers (list) : list of the headers from each of the 3 extensions
+    all_filts (list)   : list of True/False; True if the filter matches the
+                         current reduction filter
+    """
     all_sci_proc = []
     all_headers = []
     all_filts = []
@@ -176,7 +199,27 @@ def do_calib(obj, filt, log_fname, nccd, mbias, mflat, mask_ccd, gain,
 
 def do_crmask(log_fname, all_sci_calib, mask_ccd, gain, rdnoise, saturation,
               obj, all_headers, root, filt, nccd, crmask_path):
-    """Test."""
+    """Detect cosmic rays and remove them from the science frames.
+
+    Parameters
+    ----------
+    log_fname (str) : full path to log file
+    all_sci_calib (list): list of images after applying bias, flat, bpm and trimming
+    mask_ccd (array) : master bad pixel mask [ccd1, ccd2]
+    gain (float) : instrument constant
+    rdnoise (float) : instrument constant
+    saturation (float) : instrument constant
+    obj (list) : list of file names
+    all_headers (list) : list of the headers from each of the 3 extensions
+    root (str) : contains object name
+    filt (str) : current filter of the images (ex: Sloan_z)
+    nccd (int) : 2 ccds for OSIRIS
+    crmask_path (str) : directory to write to cosmic ray corrected images to
+
+    Returns
+    -------
+    all_sci_proc (list): list of images after removing cosmic rays
+    """
     gtcsetup.print_both(log_fname, '    Removing cosmic rays')
     all_sci_proc = []
 
@@ -261,7 +304,6 @@ def do_bkg_sky_subtraction(all_sci_proc, all_headers, log_fname,
     sci_final (arr) : list of all images with both ccds after sky and bkg subtraction
     sci_skymap (arr) : sky image with both ccds (median combined science image
                                                  with stars masked out)
-
     """
     sci_skymap = []
     all_bkg_sub_images = []
@@ -412,8 +454,6 @@ def do_bkg_subtraction(all_sci_proc, all_headers, log_fname, skymap_path):
     Returns
     -------
     sci_final (arr) : list of all images with both ccds after bkg subtraction
-
-
     """
     all_bkg_sub_images = []
     # Focus on one ccd at a time
@@ -478,7 +518,30 @@ def tellme(s):
 
 def plot_images(img, ref_img, w, ref_wcs, sky, tbl_crds, obj_ra,
                 obj_dec, n_stars, pts, select):
-    """Test."""
+    """Plot the OSIRIS image and a reference SDSS image w/detected stars in each.
+
+    Parameters
+    ----------
+    img (array) : stacked science image; 1 ccd
+    ref_img (array) : SDSS image for reference
+    w (?) : wcs information for the science image
+    ref_wcs (?) : wcs information for the reference image
+    sky (SkyCoord) : coordinates of the center of the ccd
+    tbl_crds (list) : list of Gaia star coordinates
+    obj_ra (list) : list of RAs of detected OSIRIS stars
+    obj_dec (list) : list of Decs of detected OSIRIS stars
+    n_stars (int) : number of stars to display on the plot
+    pts (list) : pairs of points corresponding to stars the user selected
+    select (str) : either gaia or osiris to designate which objects the user
+                   selected
+
+    Returns
+    -------
+    fig (figure) : figure containing the OSIRIS image, SDSS image, and detected
+                    stars overplotted
+    all_patches (list) : list of all patch objects (circle with x,y,r) for either
+                        Gaia or OSIRIS depending on the variable select
+    """
     font_prop = font_manager.FontProperties(size=14)
 
     fig = plt.figure(figsize=(12, 12))
@@ -540,11 +603,22 @@ def plot_images(img, ref_img, w, ref_wcs, sky, tbl_crds, obj_ra,
 
     plt.legend()
 
-    return fig, ref_wcs, all_patches
+    return fig, all_patches
 
 
 def select_points(img, select_n_stars, color):
-    """Test."""
+    """Set up interactive point selection.
+
+    Parameters
+    ----------
+    img (array) : stacked science image; 1 ccd
+    select_n_stars (int) : minimum number of stars the user must select
+    color (str) : color of cirlce the user must select
+
+    Returns
+    -------
+    pts (list) : pairs of points corresponding to stars the user selected
+    """
     while True:
         pts = []
         while len(pts) < select_n_stars:
@@ -580,7 +654,17 @@ def select_points(img, select_n_stars, color):
 
 
 def select_yes_no(img, select_n_stars):
-    """Test."""
+    """Set up interactive point selection.
+
+    Parameters
+    ----------
+    img (array) : stacked science image; 1 ccd
+    select_n_stars (int) : minimum number of stars the user must select
+
+    Returns
+    -------
+    pts (list) : one pairs of points corresponding to the user's selection
+    """
     while True:
         pts = []
         while len(pts) < select_n_stars:
@@ -607,7 +691,21 @@ def select_yes_no(img, select_n_stars):
 
 
 def plot_check_img(img, final_wcs, tbl_crds):
-    """Test."""
+    """Plot the OSIRIS image w/Gaia stars to check updated astrometry.
+
+    Parameters
+    ----------
+    img (array) : stacked science image with corrected astrometry; 1 ccd
+    final_wcs (?) : updated wcs information for the science image
+    tbl_crds (list) : list of Gaia star coordinates
+
+    Returns
+    -------
+    fig3 (figure) : figure containing the OSIRIS image in x/y and ra/dec, and
+                    detected stars overplotted
+    all_patches (list) : list of all 2 patch objects (circle with x,y,r) for
+                        yes/no
+    """
     font_prop = font_manager.FontProperties(size=14)
 
     fig3 = plt.figure(figsize=(12, 10))
@@ -656,7 +754,20 @@ def plot_check_img(img, final_wcs, tbl_crds):
 
 
 def get_gaia_img_cat(img, pix_limit, w, sky, log_fname):
-    """Test."""
+    """Get a catalog of stars that are within the limits of the OSIRSI image.
+
+    Parameters
+    ----------
+    img (array) : stacked science image; 1 ccd
+    pix_limit (int) :
+    w (?) : wcs information for the science image
+    sky (SkyCoord) : coordinates of the center of the ccd
+    log_fname (?) : opened log file
+
+    Returns
+    -------
+    tbl_crds (list) : list of Gaia star coordinates
+    """
     # Getting corners of the ccd to select only stars that are actually in the
     # image
     pairs = [(pix_limit, pix_limit), (pix_limit, img.shape[0]-pix_limit),
@@ -698,7 +809,30 @@ def get_gaia_img_cat(img, pix_limit, w, sky, log_fname):
 
 
 def get_osiris_obj_cat(img, fname, w, pix_limit, log_fname):
-    """Test."""
+    """Detect sources in the OSIRIS image using source extractor.
+
+    Detect sources
+    Eliminate objects with source extractor flags (saturated etc)
+    Elliminate objects that are too close to the edge
+    Eliminate objects that are too elliptical
+    Convert x/y to RA/Dec
+
+    Parameters
+    ----------
+    img (array) : stacked science image; 1 ccd
+    pix_limit (int) : value in pixels that determines how far away from the edge
+                      of the image a star must be
+    w (?) : wcs information for the science image
+    sky (SkyCoord) : coordinates of the center of the ccd
+    log_fname (?) : opened log file
+
+    Returns
+    -------
+    obj_ra (list) : list of RAs of detected OSIRIS stars
+    obj_dec (list) : list of Decs of detected OSIRIS stars
+    final_x (list) : list of x coordinates in pixels of detect OSIRIS stars
+    final_y (list) : list of y coordinates in pixels of detect OSIRIS stars
+    """
     # detect sources in OSIRIS image using source extractor
     try:
         bkg = sep.Background(img)
@@ -761,13 +895,39 @@ def get_osiris_obj_cat(img, fname, w, pix_limit, log_fname):
 
 
 def in_circle(center_x, center_y, radius, x, y):
-    """Test."""
+    """Determine if an (x,y) point is within a circle.
+
+    Parameters
+    ----------
+    center_x (float) : x coordinate of the circle in pixels
+    center_y (float) : y coordinate of the circle in pixels
+    radius (float) : radius of the circle in pixels
+    x (float) : x coordinate of the point in pixels
+    y (float) : y coordinate of the circle in pixels
+
+    Returns
+    -------
+    True or False if the squared distance is less than the radius of the circle
+    squared
+    """
     square_dist = (center_x - x) ** 2 + (center_y - y) ** 2
     return square_dist <= radius ** 2
 
 
 def cross_match(all_patches, selected_pts, radius):
-    """Test."""
+    """Cross match the user selected points w/the coordinates of detected sources.
+
+    Parameters
+    ----------
+    all_patches (list)
+    selected_pts (list)
+    radius (float) : radius of the circle in pixels
+
+    Returns
+    -------
+    final_pts (array) :
+
+    """
     final_pts = []
     for pt in selected_pts:
         # print('Pt', pt)
@@ -782,7 +942,21 @@ def cross_match(all_patches, selected_pts, radius):
 
 
 def final_check(img, final_wcs, tbl_crds, log_fname):
-    """Test."""
+    """Plot the OSIRIS image w/Gaia stars to check updated astrometry.
+
+    Parameters
+    ----------
+    img (array) : stacked science image with corrected astrometry; 1 ccd
+    final_wcs (?) : updated wcs information for the science image
+    tbl_crds (list) : list of Gaia star coordinates
+    log_fname (?) : opened log file
+
+    Returns
+    -------
+    yes (astrometry is good), OR no (astrometry is not good) OR
+    final_check (if user did not select yes or no)
+
+    """
     # Plot the OSIRIS image with the new wcs and overplot Gaia points to make
     # sure astrometry is good; user selects yes or no
     fig3, all_patches = plot_check_img(img, final_wcs, tbl_crds)
@@ -840,16 +1014,13 @@ def do_interactive_astrometry(final_name, fname, full_filt, ccd, astrom_path,
         - select_n_stars
         - sip_deg
 
-
-    NOTE TO SELF*** ADD ELLIPTICITY CHECK ***
-
     Parameters
     ----------
     final_name (str) : the name to write the corrected image to
     fname (str) : the name of the image to perform astrometry on (will be 1 ccd)
     full_filt (str) : the current filter (ex: Sloan_z)
-    ccd (?)
-    astrom_path
+    ccd (str) : 1 or 2
+    astrom_path (str) : directory to write to astrometry related images to
     log_fname (?) : log file to append print statements to
 
     Returns
@@ -899,8 +1070,8 @@ def do_interactive_astrometry(final_name, fname, full_filt, ccd, astrom_path,
 
     # Plot the OSIRIS image and the SDSS image with detected objects and
     # Gaia sources overlayed; select OSIRIS stars
-    fig, ref_wcs, all_patches = plot_images(img, ref_img, w, ref_wcs, sky, tbl_crds,
-                                            obj_ra, obj_dec, n_stars, [], 'osiris')
+    fig, all_patches = plot_images(img, ref_img, w, ref_wcs, sky, tbl_crds,
+                                   obj_ra, obj_dec, n_stars, [], 'osiris')
 
     # Wait for user to select at least n points
     # select_n_stars = 6
@@ -920,13 +1091,12 @@ def do_interactive_astrometry(final_name, fname, full_filt, ccd, astrom_path,
 
     # Plot the OSIRIS image and the SDSS image with detected objects and
     # Gaia sources overlayed; select GAIA stars
-    fig2, ref_wcs2, all_patches2 = plot_images(img, ref_img, w, ref_wcs, sky,
-                                               tbl_crds, obj_ra, obj_dec,
-                                               n_stars, pts, 'gaia')
+    fig2, all_patches2 = plot_images(img, ref_img, w, ref_wcs, sky, tbl_crds,
+                                     obj_ra, obj_dec, n_stars, pts, 'gaia')
 
     # Wait for user to select at least n points
-    tellme('You will now select 6 BLUE (gaia) stars in the same order (pink numbers).'
-           'Click anywhere to begin.')
+    tellme('You will now select 6 BLUE (gaia) stars in the same order'
+           ' (pink numbers). Click anywhere to begin.')
     plt.waitforbuttonpress()
     pts2 = select_points(img, select_n_stars, 'BLUE')
 
@@ -978,7 +1148,28 @@ def do_interactive_astrometry(final_name, fname, full_filt, ccd, astrom_path,
 
 def calc_astrometry_accuracy(img, final_wcs, final_x, final_y, tbl_crds, astrom_path,
                              ccd, final_name, log_fname):
-    """Test."""
+    """Compare OSIRIS stars with corrected astrometry to Gaia stars.
+
+    On the left show the OSIRIS image with all Gaia stars overplotted.
+    On the right, show a histogram of the distances between matched OSIRIS/Gaia
+        stars that are
+
+    Parameters
+    ----------
+    img (array) : stacked astrometry corrected science image; 1 ccd
+    final_wcs (?) : updated wcs information for the science image
+    final_x (list) : list of x coordinates in pixels of detect OSIRIS stars
+    final_y (list) : list of y coordinates in pixels of detect OSIRIS stars
+    tbl_crds (list) : list of Gaia star coordinates
+    astrom_path (str) : directory to write to astrometry related images to
+    ccd (str) : 1 or 2
+    final_name (str) : the name to write the corrected image to
+    log_fname (str) : full path to log file
+
+    Returns
+    -------
+    None
+    """
     font_prop = font_manager.FontProperties(size=14)
 
     obj_ra = []
@@ -997,6 +1188,7 @@ def calc_astrometry_accuracy(img, final_wcs, final_x, final_y, tbl_crds, astrom_
 
     # cutoff = 2  # arcsec
     good = np.where(d2d.arcsec < cutoff)[0]
+    # good = np.arange(len(d2d))
 
     fig = plt.figure(figsize=(12, 14))
     ax = fig.add_subplot(121, projection=final_wcs)
@@ -1018,7 +1210,8 @@ def calc_astrometry_accuracy(img, final_wcs, final_x, final_y, tbl_crds, astrom_
     ax2.hist(d2d[good].arcsec)
     ax2.set_xlabel('Separation (arcsec)', fontproperties=font_prop)
     ax2.set_title("CCD"+ccd+': Median = '+str(round(
-        np.median(d2d[good].arcsec), 6))+'arcsec',
+        np.median(d2d[good].arcsec), 6))+'arcsec \n Stdv: '+str(round(
+            np.std(d2d[good].arcsec), 6)),
         fontproperties=font_prop)
 
     plt.savefig(astrom_path+final_name.split('/')
@@ -1088,14 +1281,31 @@ def crop_padding(img):
 
     # plt.figure()
     # plt.imshow(cropped_img, origin='lower', interpolation='none',
-    #            vmin=np.nanmean(img)-np.nanstd(img), vmax=np.nanmean(img)+np.nanstd(img))
+    #             vmin=np.nanmean(img)-np.nanstd(img),
+    #             vmax=np.nanmean(img)+np.nanstd(img))
     # plt.show()
 
     return cropped_img, x1, y1
 
 
 def do_stacking(sci_final, all_headers, args, root, filt, astrom_path, log_fname):
-    """Test."""
+    """Align images with eachother and stack/median combine them into one image.
+
+    Parameters
+    ----------
+    sci_final (list): list of images after applying all calibrations/corrections
+    all_headers (list) : list of the headers from each of the 3 extensions
+    args (?) : user inputted arguments from the command line
+    root (str) : contains object name
+    filt (str) : current filter of the images (ex: Sloan_z)
+    astrom_path (str) : directory to write to astrometry related images to
+    log_fname (str) : full path to log file
+
+    Returns
+    -------
+    final_aligned_image (list): [ccd1,ccd2] image after aligning/combining
+                                individual images
+    """
     if len(sci_final) == 1:
         gtcsetup.print_both(log_fname, 'ONLY 1 IMAGE; NOT COMBINING')
 
@@ -1179,10 +1389,10 @@ def do_stacking(sci_final, all_headers, args, root, filt, astrom_path, log_fname
         # Crop out the padding in the median combined image
         cropped_img1, x1, y1 = crop_padding(median_aligned_img)
 
-        all_headers[0][ccd +
-                       1]['CRPIX1'] = float(all_headers[0][ccd+1]['CRPIX1'])+float(x1)
-        all_headers[0][ccd +
-                       1]['CRPIX2'] = float(all_headers[0][ccd+1]['CRPIX2'])+float(y1)
+        all_headers[0][ccd + 1]['CRPIX1'] = float(
+            all_headers[0][ccd+1]['CRPIX1'])+float(x1)
+        all_headers[0][ccd + 1]['CRPIX2'] = float(
+            all_headers[0][ccd+1]['CRPIX2'])+float(y1)
 
         cropped_img = median_aligned_img
         # gtcsetup.write_ccd(all_headers[i][0], all_headers[i][1:],
