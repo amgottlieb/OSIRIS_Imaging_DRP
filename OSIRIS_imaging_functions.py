@@ -71,7 +71,9 @@ select_n_stars = 6
 # sip_deg determines the distortion correction
 sip_deg = 2
 
-
+# tolerance  is used in auto_astrometry to set how far large of an area the
+# program can look for matching Gaia stars. If your astrometry is good,
+# this can be smaller.
 tolerance = 15
 
 
@@ -524,7 +526,7 @@ def tellme(s):
 
 
 def plot_images(img, ref_img, w, ref_wcs, sky, tbl_crds, obj_ra,
-                obj_dec, n_stars, pts, select):
+                obj_dec, n_stars, pts, select, patch_radius=patch_radius):
     """Plot the OSIRIS image and a reference SDSS image w/detected stars in each.
 
     Parameters
@@ -1495,27 +1497,26 @@ def plot_auto_astrometry(img, w, img_xy, img_radec, ref_img, ref_wcs, ref_xy,
                          bad_gaia_inds):
     """Test."""
     colors = ['r', 'g', 'b', 'y', 'cyan', 'k', 'm']*10
-
-    fig = plt.figure()
-    # left bottom width height
-    ax = fig.add_axes([0.1, 0.1, 0.45, 0.8])  # , projection=w)
     m = np.nanmean(img)
     s = np.nanstd(img)
+
+    fig = plt.figure(figsize=(10, 10))
+    # left bottom width height
+    ax = fig.add_axes([0.1, 0.1, 0.45, 0.8])  # , projection=w)
     ax.imshow(img, cmap='gray', interpolation='none',
               origin='lower', vmin=m-s, vmax=m+s)
-    ax.set_title("Source Image")
+    # ax.set_title("Source Image")
+
     for i in range(len(all_gaia_inds)):
         ax.plot(img_xy[0][all_gtc_inds[i]], img_xy[1][all_gtc_inds[i]],
                 'o', c=colors[i])  # , transform=ax.get_transform('fk5'))
         ax.plot(ref_xy[0][all_gaia_inds[i]], ref_xy[1][all_gaia_inds[i]],
                 'o', c=colors[i], alpha=0.5)
 
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+
     ax2 = fig.add_axes([0.5, 0.1, 0.45, 0.8], projection=w)
-    # m2 = np.mean(ref_img)
-    # s2 = np.std(ref_img)
-    # ax.set_title('Fake Gaia Image')
-#     ax2.imshow(ref_img, origin='lower', cmap='gray',
-#                vmin=m2-s2, vmax=m2+s2, interpolation='none')
     ax2.imshow(img, cmap='gray', interpolation='none',
                origin='lower', vmin=m-s, vmax=m+s)
 
@@ -1528,7 +1529,9 @@ def plot_auto_astrometry(img, w, img_xy, img_radec, ref_img, ref_wcs, ref_xy,
         ax2.plot(img_radec.ra.deg[bad_gtc_inds[i]],
                  img_radec.dec.deg[bad_gtc_inds[i]], 'x',
                  c='orange', transform=ax2.get_transform('fk5'))
-    #         ax2.plot(gaia_x[bad_gaia[i]], gaia_y[bad_gaia[i]], 'x', c='orange')
+    ax2.set_xlabel('RA')
+    ax2.set_ylabel('Dec')
+    plt.suptitle('OSIRIS image; press q to close and continue data reduction.')
 
 
 def do_auto_astrometry(final_aligned_image, full_filt, seeing, astrom_path,
@@ -1618,39 +1621,41 @@ def do_auto_astrometry(final_aligned_image, full_filt, seeing, astrom_path,
             #                     "Achieved accuracy:\n{0}".format(e.accuracy))
             raise e
 
-        m = np.nanmean(img.data)
-        s = np.nanstd(img.data)
-        fig = plt.figure()
-        ax = fig.add_axes([0.1, 0.1, 0.45, 0.8])  # , projection=)
-        ax.imshow(img.data, origin='lower', interpolation='none',
-                  vmin=m-s, vmax=m+s, cmap='gray')
-        # ax.plot(final_x, final_y, 'o', label='image sources')
-        for i in range(len(final_x)):
-            ax.add_patch(patches.Circle((final_x[i], final_y[i]),
-                                        radius=cutoff/pix_scale, ec='b',
-                                        fc='none', lw=2, alpha=0.8))
-        ax.plot(ref_x, ref_y, '.', label='gaia sources', c='r')
-        ax.set_title('before correcting or trimming')
-        ax.legend()
-        ax2 = fig.add_axes([0.5, 0.1, 0.45, 0.8], projection=w)
-        ax2.imshow(img.data, origin='lower', interpolation='none',
-                   vmin=m-s, vmax=m+s, cmap='gray')
-        ax2.plot(obj_ra, obj_dec, 'o', c='b', label='image sources',
-                 transform=ax2.get_transform('fk5'))
-        ax2.plot(ref_radec.ra, ref_radec.dec, '.', c='r',
-                 label='gaia sources', transform=ax2.get_transform('fk5'))
+        search_radius = seeing/pix_scale*tolerance
+        print(search_radius)
+        n_stars = min(n_stars_init, len(ref_x), len(final_x))
+        print(n_stars)
+        fig, all_patches = plot_images(img, ref_img, w, ref_wcs, sky, ref_radec,
+                                       obj_ra, obj_dec, n_stars, [], 'osiris',
+                                       patch_radius=search_radius)
+
+        # m = np.nanmean(img.data)
+        # s = np.nanstd(img.data)
+        # fig = plt.figure()
+        # ax = fig.add_axes([0.1, 0.1, 0.45, 0.8])  # , projection=)
+        # ax.imshow(img.data, origin='lower', interpolation='none',
+        #           vmin=m-s, vmax=m+s, cmap='gray')
+        # # ax.plot(final_x, final_y, 'o', label='image sources')
+        # for i in range(len(final_x)):
+        #     ax.add_patch(patches.Circle((final_x[i], final_y[i]),
+        #                                 radius=cutoff/pix_scale, ec='b',
+        #                                 fc='none', lw=2, alpha=0.8))
+        # ax.plot(ref_x, ref_y, '.', label='gaia sources', c='r')
+        # ax.set_title('before correcting or trimming')
+        # ax.legend()
+        # ax2 = fig.add_axes([0.5, 0.1, 0.45, 0.8], projection=w)
+        # ax2.imshow(img.data, origin='lower', interpolation='none',
+        #            vmin=m-s, vmax=m+s, cmap='gray')
+        # ax2.plot(obj_ra, obj_dec, 'o', c='b', label='image sources',
+        #          transform=ax2.get_transform('fk5'))
+        # ax2.plot(ref_radec.ra, ref_radec.dec, '.', c='r',
+        #          label='gaia sources', transform=ax2.get_transform('fk5'))
 
         ref_radec = ref_radec
         ref_xy = np.array([ref_x, ref_y])
         img_xy = np.array([final_x, final_y])
         # np.array([obj_ra[good],obj_dec[good]])
         img_radec = SkyCoord(list(zip(obj_ra, obj_dec)), frame='fk5', unit='deg')
-
-        search_radius = seeing/pix_scale*tolerance
-
-        print(search_radius)
-        n_stars = min(n_stars_init, len(ref_x), len(final_x))
-        print(n_stars)
 
         all_gaia_inds = []
         all_gtc_inds = []
