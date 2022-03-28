@@ -68,6 +68,7 @@ If you have already done some of the steps with the pipeline and would like to s
 The output files are:
 
 Main files:
+
     MasterBias.fits
     MasterFlatSloan_g.fits (and other filters)
     MasterBPMSloan_g.fits (and other filters)
@@ -78,6 +79,7 @@ Main files:
         Standard_Star_OSIRIS_filter_ccd1.fits and final_Standard_Star_OSIRIS_filter_ccd2.fits
 
 Diagnostic folder which contains the following folders:
+
     1-calib
         images with bias, flat applied, split into ccd1 and ccd2 for both the target and standard star
     2-bpm
@@ -92,21 +94,21 @@ Diagnostic folder which contains the following folders:
         pad_aligned - images after aligning with eachother split into ccd1 and ccd2 for both the target and standard star
         footprint- footprints that show which direction the images were shifted; NOTE: if you're using ds9 to view these files, change the color to aips0
         
-See the output folder in https://drive.google.com/drive/folders/12mIXEg5bA2IgjTOwK6NLanjZS-1Ls407?usp=sharing for examples of a good master bias, flat, sky map, and final image as well as the raw data (which is also in the copy folder).
+See the output folder in https://drive.google.com/drive/folders/12mIXEg5bA2IgjTOwK6NLanjZS-1Ls407?usp=sharing for examples of a good master bias, flat, sky map, and final image as well as the raw data.
 
 If the default values don't work for you, some parameters you may want to change (with explanations) can be found at the top of the OSIRIS_imaging_functions.py file as well as below:
 
-- cutoff = 2 arcsec; cutoff is used in calc_astrometry_accuracy around line 1190. Separations between OSIRIS objects and GAIA stars that are less than this are considered good
-- pad = 200 pixels; pad is used in do_stacking around line 1325. It is the number of rows/columns to add onto each side of the image before aligning and combining (in pixels)
--ellipse_lim = 1. is used in get_osiris_obj_cat around line 874; objects with ellipticities less than this will be included in the OSIRIS detected object catalog/for astrometry
--patch_radius = 5 pixels; it is used in plot_images and plot_check_images to set the radius of the circles around the detected stars
-- parameters in detect_cosmics
+    - cutoff = 2 arcsec; cutoff is used in calc_astrometry_accuracy around line 1190. Separations between OSIRIS objects and GAIA stars that are less than this are considered good
+    - pad = 200 pixels; pad is used in do_stacking around line 1325. It is the number of rows/columns to add onto each side of the image before aligning and combining (in pixels)
+    -ellipse_lim = 1. is used in get_osiris_obj_cat around line 874; objects with ellipticities less than this will be included in the OSIRIS detected object catalog/for astrometry
+    -patch_radius = 5 pixels; it is used in plot_images and plot_check_images to set the radius of the circles around the detected stars
+    - parameters in detect_cosmics
 
 Note: the remaining varibles are used in do_interactive_astrometry around line 980
 
--cross_match_r = patch_radius; as long as you click within the circle of this radius, this should be fine
-- pix_limit = 0 pixels; it determines how close to the edge of the image stars can be; stars at pixel values less than this will not be included in the detected object catalog/for astrometry
-- n_stars_init = 40; n_stars determines how many of the brightest stars (n_stars) will be displayed when doing interactive photometry. If there are less than 40 detected sources, n_stars will default to the number of detected sources.
-- select_n_stars = 6 is the minimum number of stars you must choose when doing interactive astrometry. Absolute minimum should be 3, 6 is sufficient, but you can choose as many as you want
-- sip_deg = 2 determines the distortion correction; this should not be more than 2
+    -cross_match_r = patch_radius; as long as you click within the circle of this radius, this should be fine
+    - pix_limit = 0 pixels; it determines how close to the edge of the image stars can be; stars at pixel values less than this will not be included in the detected object catalog/for astrometry
+    - n_stars_init = 40; n_stars determines how many of the brightest stars (n_stars) will be displayed when doing interactive photometry. If there are less than 40 detected sources, n_stars will default to the number of detected sources.
+    - select_n_stars = 6 is the minimum number of stars you must choose when doing interactive astrometry. Absolute minimum should be 3, 6 is sufficient, but you can choose as many as you want
+    - sip_deg = 2 determines the distortion correction; this should not be more than 2
 
