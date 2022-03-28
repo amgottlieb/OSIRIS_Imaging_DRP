@@ -72,6 +72,13 @@ select_n_stars = 6
 sip_deg = 2
 
 
+tolerance = 15
+
+
+# do not change this:
+pix_scale = 0.254  # arcsec per pixel
+
+
 def do_calib(obj, filt, log_fname, nccd, mbias, mflat, mask_ccd, gain,
              rdnoise, calib_path, bpm_path, root):
     """Apply bias, flat and bad pixel mask to science frames.
@@ -1433,7 +1440,99 @@ def do_stacking(sci_final, all_headers, args, root, filt, astrom_path, log_fname
     return final_aligned_image
 
 
-def do_auto_astrometry(gaia, sources, wcs_ref, ima, log_fname):
+def get_matches(all_gtc_inds, all_gaia_inds):
+    """Test."""
+    flat_list = [item for sublist in all_gaia_inds for item in sublist]
+    dup_inds = [i for i, x in enumerate(flat_list) if flat_list.count(x) > 1]
+    dupes = list(set(np.array(flat_list)[dup_inds]))
+
+    flags = np.zeros(len(all_gaia_inds))
+    # 0 = good, no duplicates or confusion
+    # 1 = >1 gaia source found within search radius
+    # 2 = confused- gaia source found more than once
+
+    for i in range(len(all_gaia_inds)):
+        flag = ''
+        if len(all_gaia_inds[i]) > 1:
+            flag = '1'
+        if all_gaia_inds[i][0] in dupes:
+            flag = '2'
+        if flag == '':
+            flag = '0'
+        flags[i] = float(flag)
+
+    good_inds = np.where(flags == 0.)[0]
+    bad_inds = np.where(flags != 0.)[0]
+
+    gtc = np.array(all_gtc_inds)[good_inds]
+    gaia = np.array(all_gaia_inds)[good_inds]
+    gaia_flat = np.array([item for sublist in gaia for item in sublist])
+
+    gtc_bad = np.array(all_gtc_inds)[bad_inds]
+    gaia_bad = np.array(all_gaia_inds)[bad_inds]
+    # print(gaia_bad)
+    gaia_flat_bad = np.array([item for sublist in gaia_bad for item in sublist])
+
+    return gtc, gaia_flat, gtc_bad, gaia_flat_bad
+
+# final_gtc_inds,final_gaia_inds,bad_gtc,bad_gaia=get_matches(all_gtc_inds,all_gaia_inds)
+
+
+def calc_dist(xcen, ycen, radius, xpts, ypts):
+    """Test."""
+    inds = []
+    distances = []
+    for i in range(len(xpts)):
+        dist = (xpts[i]-xcen)**2+(ypts[i]-ycen)**2
+        if dist <= radius**2:
+            inds.append(i)
+            distances.append(dist)
+    return np.array(inds), np.array(distances)
+
+
+def plot_auto_astrometry(img, w, img_xy, img_radec, ref_img, ref_wcs, ref_xy,
+                         ref_radec, all_gtc_inds, all_gaia_inds, bad_gtc_inds,
+                         bad_gaia_inds):
+    """Test."""
+    colors = ['r', 'g', 'b', 'y', 'cyan', 'k', 'm']*10
+
+    fig = plt.figure()
+    # left bottom width height
+    ax = fig.add_axes([0.1, 0.1, 0.45, 0.8])  # , projection=w)
+    m = np.nanmean(img)
+    s = np.nanstd(img)
+    ax.imshow(img, cmap='gray', interpolation='none',
+              origin='lower', vmin=m-s, vmax=m+s)
+    ax.set_title("Source Image")
+    for i in range(len(all_gaia_inds)):
+        ax.plot(img_xy[0][all_gtc_inds[i]], img_xy[1][all_gtc_inds[i]],
+                'o', c=colors[i])  # , transform=ax.get_transform('fk5'))
+        ax.plot(ref_xy[0][all_gaia_inds[i]], ref_xy[1][all_gaia_inds[i]],
+                'o', c=colors[i], alpha=0.5)
+
+    ax2 = fig.add_axes([0.5, 0.1, 0.45, 0.8], projection=w)
+    # m2 = np.mean(ref_img)
+    # s2 = np.std(ref_img)
+    # ax.set_title('Fake Gaia Image')
+#     ax2.imshow(ref_img, origin='lower', cmap='gray',
+#                vmin=m2-s2, vmax=m2+s2, interpolation='none')
+    ax2.imshow(img, cmap='gray', interpolation='none',
+               origin='lower', vmin=m-s, vmax=m+s)
+
+    for i in range(len(all_gaia_inds)):
+        ax2.plot(img_radec.ra.deg[all_gtc_inds[i]],
+                 img_radec.dec.deg[all_gtc_inds[i]], 'o', c=colors[i],
+                 transform=ax2.get_transform('fk5'))
+
+    for i in range(len(bad_gtc_inds)):
+        ax2.plot(img_radec.ra.deg[bad_gtc_inds[i]],
+                 img_radec.dec.deg[bad_gtc_inds[i]], 'x',
+                 c='orange', transform=ax2.get_transform('fk5'))
+    #         ax2.plot(gaia_x[bad_gaia[i]], gaia_y[bad_gaia[i]], 'x', c='orange')
+
+
+def do_auto_astrometry(final_aligned_image, full_filt, seeing, astrom_path,
+                       final_name, log_fname):
     """Automatically correct the astrometry of an image.
 
     Parameters
@@ -1451,109 +1550,141 @@ def do_auto_astrometry(gaia, sources, wcs_ref, ima, log_fname):
         were within a certain distance in arcsec of a gaia catalog star
         (aka matched)**
     """
-    # Get skycoord formatted ra/dec of refrence gaia stars
-    sky_ref_radec_init = SkyCoord(list(zip(np.array(gaia['ra']),
-                                           np.array(gaia['dec']))),
-                                  frame='fk5', unit='deg')
+    gtcsetup.print_both(log_fname, 'Doing AUTOMATIC astrometry')
 
-    # Convert gaia ra/dec into pixels using the original wcs info
-    sky_ref_x = []
-    sky_ref_y = []
-    good_ref = []
-    print('number of gaia sources: ', len(gaia['ra']))
-    print('number of sources in image: ', len(sources))
+    filt = full_filt.split('_')[-1]  # 'z'
 
-    try:
-        x, y = wcs_ref.all_world2pix(gaia['ra'], gaia['dec'], 1, maxiter=100,
-                                     tolerance=5e-4, detect_divergence=True,
-                                     adaptive=True, quiet=True)
-    except wcs.NoConvergence as e:
-        gtcsetup.print_both(log_fname, "Indices of diverging points: {0}"
-                            .format(e.divergent))
-        gtcsetup.print_both(log_fname, "Indices of poorly converging points: {0}"
-                            .format(e.slow_conv))
-        gtcsetup.print_both(log_fname,
-                            [i for i in range(len(gaia['ra']))
-                             if i not in e.divergent and i not in e.slow_conv])
-        gtcsetup.print_both(log_fname, len(gaia['ra']))
-        # gtcsetup.print_both(log_fname,
-        #                     "Best solution:\n{0}".format(e.best_solution))
-        # gtcsetup.print_both(log_fname,
-        #                     "Achieved accuracy:\n{0}".format(e.accuracy))
-        raise e
+    all_headers = []
+    for ccd in range(len(final_aligned_image)):
 
-    plt.figure()
-    plt.plot(sources['xcentroid'], sources['ycentroid'], 'o', label='image sources')
-    plt.plot(x, y, '.', label='gaia sources')
-    plt.title('before correcting or trimming')
-    plt.legend()
+        gtcsetup.print_both(log_fname, 'Working on CCD', ccd+1)
 
-    for j in range(len(gaia['ra'])):
+        img = final_aligned_image[ccd].data
+        hdr = final_aligned_image[ccd].header
 
-        # exclude sources that are too close to the edge;
-        # I randomly chose 20 pixels as the limit
-        if x[j] > 20 and y[j] > 20 and x[j] < ima.shape[1]-20. and (
-                y[j] < ima.shape[0]-20.):
-            sky_ref_x.append(x)
-            sky_ref_y.append(y)
-            good_ref.append(j)
-    sky_ref_x = np.array(sky_ref_x)
-    sky_ref_y = np.array(sky_ref_y)
+        w = final_aligned_image[ccd].wcs
 
-    # Get stars that are not close to the edge
-    sky_ref_radec = sky_ref_radec_init[good_ref]
+        # Get the approximate center of the current image in ra/dec
+        sky = w.pixel_to_world(img.shape[1]/2, img.shape[0]/2)
+        gtcsetup.print_both(log_fname, 'Center of ccd:', sky.ra.deg, sky.dec.deg)
 
-    # Get / format x/y coordinates of sources found in image
-    sky_img_xy = np.array([list(sources['xcentroid']),
-                           list(sources['ycentroid'])])
+        # Get sdss image to compare to OSIRIS image
+        ref_img = SkyView.get_images(position=str(sky.ra.deg)+','+str(sky.dec.deg),
+                                     # survey='SDSSz',
+                                     survey='SDSS'+filt,
+                                     coordinates='J2000',
+                                     pixels=str(img.shape[1])+','+str(img.shape[0]))
+        if len(ref_img) == 0:
+            ref_img = SkyView.get_images(
+                position=str(sky.ra.deg)+','+str(sky.dec.deg), survey='DSS',
+                coordinates='J2000', pixels=str(img.shape[1])+','+str(img.shape[0]))
+        # print(ref_img)
+        ref_img = ref_img[0]
+        # print(ref_img[0].data)
+        # Get wcs information from SDSS image
+        ref_wcs = wcs.WCS(ref_img[0].header)
+        # print(ref_wcs)
 
-    # Convert all x/y coordinates of sources in image to ra/dec
-    sky_img_radec_init = wcs_ref.wcs_pix2world(
-        sky_img_xy[0], sky_img_xy[1], 1)
+        # pix_limit = 0
+        # Detect sources in the OSIRIS image and convert x/y to ra/dec using the
+        # original wcs information
+        obj_ra, obj_dec, final_x, final_y = get_osiris_obj_cat(
+            img.byteswap().newbyteorder(), '', w, pix_limit, log_fname)
 
-    # get skycoord formatted ra/dec of sources (same format as reference stars)
-    sky_img_radec = SkyCoord(
-        list(zip(sky_img_radec_init[0], sky_img_radec_init[1])),
-        frame='fk5', unit='deg')
+        # Get ra/dec of gaia stars that cover the OSIRIS image
+        ref_radec = get_gaia_img_cat(img.data, pix_limit, w, sky, log_fname)
 
-    # match reference catalog with source list
-    idx, d2d, d3d = sky_img_radec.match_to_catalog_sky(sky_ref_radec)
-    # Only take sources that are within a certain distance
-    # in this case, the median distance;
-    cutoff = np.median(d2d.arcsec)*2.  # TO DO: UPDATE THIS #############
-    good = np.where(d2d.arcsec < cutoff)[0]
-    use_ref_radec = sky_ref_radec[idx][good]
-    use_img_xy = np.array([sky_img_xy[0][good], sky_img_xy[1][good]])
+        print('number of gaia sources: ', len(ref_radec))
+        print('number of sources in image: ', len(obj_ra))
 
-    gaia_sky_coords = []
-    for i in range(len(use_ref_radec)):
-        gaia_sky_coords.append(
-            [use_ref_radec[i].ra.degree, use_ref_radec[i].dec.degree])
-    gaia_sky_coords = np.array(gaia_sky_coords)
-    print(gaia_sky_coords.shape)
+        try:
+            ref_x, ref_y = w.all_world2pix(ref_radec.ra, ref_radec.dec, 0,
+                                           maxiter=100,
+                                           tolerance=5e-4,
+                                           detect_divergence=True,
+                                           adaptive=True, quiet=True)
+        except wcs.NoConvergence as e:
+            gtcsetup.print_both(log_fname, "Indices of diverging points: {0}"
+                                .format(e.divergent))
+            gtcsetup.print_both(log_fname, "Indices of poorly converging points: {0}"
+                                .format(e.slow_conv))
+            gtcsetup.print_both(log_fname,
+                                [i for i in range(len(ref_radec.ra))
+                                 if i not in e.divergent and i not in e.slow_conv])
+            gtcsetup.print_both(log_fname, len(ref_radec.ra))
+            # gtcsetup.print_both(log_fname,
+            #                     "Best solution:\n{0}".format(e.best_solution))
+            # gtcsetup.print_both(log_fname,
+            #                     "Achieved accuracy:\n{0}".format(e.accuracy))
+            raise e
 
-    plt.figure()
-    plt.hist(d2d.arcsec, bins=20)
-    plt.axvline(cutoff, c='k')
+        m = np.nanmean(img.data)
+        s = np.nanstd(img.data)
+        fig = plt.figure()
+        ax = fig.add_axes([0.1, 0.1, 0.45, 0.8])  # , projection=)
+        ax.imshow(img.data, origin='lower', interpolation='none',
+                  vmin=m-s, vmax=m+s, cmap='gray')
+        # ax.plot(final_x, final_y, 'o', label='image sources')
+        for i in range(len(final_x)):
+            ax.add_patch(patches.Circle((final_x[i], final_y[i]),
+                                        radius=cutoff/pix_scale, ec='b',
+                                        fc='none', lw=2, alpha=0.8))
+        ax.plot(ref_x, ref_y, '.', label='gaia sources', c='r')
+        ax.set_title('before correcting or trimming')
+        ax.legend()
+        ax2 = fig.add_axes([0.5, 0.1, 0.45, 0.8], projection=w)
+        ax2.imshow(img.data, origin='lower', interpolation='none',
+                   vmin=m-s, vmax=m+s, cmap='gray')
+        ax2.plot(obj_ra, obj_dec, 'o', c='b', label='image sources',
+                 transform=ax2.get_transform('fk5'))
+        ax2.plot(ref_radec.ra, ref_radec.dec, '.', c='r',
+                 label='gaia sources', transform=ax2.get_transform('fk5'))
 
-    # Get the new wcs information
-    # format of lists required by fit_wcs_from_points:
-    # use_img_xy = np.array([[xlist],[ylist]])
-    # use_ref_radec=SkyCoord([(ra,dec),(ra,dec)...],frame='fk5',unit='deg')
-    # NOTE on sip_degree=2: not sure why I picked this but it seems to work?
-    w = fit_wcs_from_points(xy=use_img_xy, world_coords=use_ref_radec,
-                            projection='TAN', sip_degree=2)
-    print(w)
+        ref_radec = ref_radec
+        ref_xy = np.array([ref_x, ref_y])
+        img_xy = np.array([final_x, final_y])
+        # np.array([obj_ra[good],obj_dec[good]])
+        img_radec = SkyCoord(list(zip(obj_ra, obj_dec)), frame='fk5', unit='deg')
 
-    sources_sky_coords = w.wcs_pix2world(
-        list(zip(use_img_xy[0], use_img_xy[1])), 0)
-    # print(sources_sky_coords)
-    print(sources_sky_coords.shape)
-    # check how good new coordinate system is
-    plt.figure()
-    plt.plot(sources_sky_coords[:, 0],
-             sources_sky_coords[:, 1], 'o', label='sources in image')
-    plt.plot(gaia_sky_coords[:, 0], gaia_sky_coords[:, 1], '.', label='gaia sources')
-    plt.legend()
-    print('-----------------------------------------')
-    return w, good
+        search_radius = seeing/pix_scale*tolerance
+
+        print(search_radius)
+        n_stars = min(n_stars_init, len(ref_x), len(final_x))
+        print(n_stars)
+
+        all_gaia_inds = []
+        all_gtc_inds = []
+        for i in range(n_stars):
+            xcen = final_x[i]  # use_img_xy[0][i]
+            ycen = final_y[i]  # use_img_xy[1][i]
+            inds, distances = calc_dist(xcen, ycen, search_radius, ref_x, ref_y)
+            if len(inds) != 0:
+                print(i, xcen, ycen, inds, distances)
+                all_gaia_inds.append(inds)
+                all_gtc_inds.append(i)
+
+        final_gtc_inds, final_gaia_inds, bad_gtc, bad_gaia = get_matches(
+            all_gtc_inds, all_gaia_inds)
+
+        plot_auto_astrometry(img, w, img_xy, img_radec, ref_img[0].data,
+                             ref_wcs, ref_xy, ref_radec,
+                             all_gtc_inds, all_gaia_inds, bad_gtc, bad_gaia)
+
+        stars_xy = img_xy.T[final_gtc_inds]
+        coords = SkyCoord(np.array([ref_radec[final_gaia_inds].ra.deg,
+                                    ref_radec[final_gaia_inds].dec.deg]).T,
+                          frame='fk5', unit='deg')
+
+        new_wcs = fit_wcs_from_points(xy=stars_xy.T, world_coords=coords.T,
+                                      projection='TAN', sip_degree=2)
+
+        hdr.update(new_wcs.to_header(relax=True))
+        final_wcs = WCS(hdr)
+
+        calc_astrometry_accuracy(img, final_wcs, final_x, final_y, ref_radec,
+                                 astrom_path, str(ccd+1), final_name +
+                                 str(ccd+1)+'.fits',
+                                 log_fname)
+        all_headers.append(hdr)
+
+    return all_headers

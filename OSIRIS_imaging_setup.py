@@ -103,6 +103,10 @@ def parse_args():
     add('--dointeractive', dest='dointeractive', action='store_true',
         help='Manually choose stars to use for performing astrometry.')
 
+    add('--seeing', dest='seeing', default=1.0,
+        help='Seeing of the images. Check the header or the QA \
+            (quality assurance) file.')
+
     add('--logfile', dest='logfile', default='log.txt',
         help='Name of the file which contains all print statements from the \
             pipeline.')

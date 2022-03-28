@@ -507,8 +507,10 @@ def main(argv):
                         times, actions, log_fname)
 
                 else:
-                    astro_cor_image = gtcdo.do_auto_astrometry(
-                        final_aligned_image)
+                    final_name = args.outputdir+'final_auto_'+root+filt+'_ccd'
+                    updated_headers = gtcdo.do_auto_astrometry(
+                        final_aligned_image, filt, args.seeing, astrom_path,
+                        final_name, log_fname)
 
                     times, actions = gtcsetup.save_times(
                         tstart, time(), 'Align pt 2',
@@ -516,9 +518,9 @@ def main(argv):
                         times, actions, log_fname)
 
                     # Write out the final image to the output folder
-                    gtcsetup.write_ccd(all_headers[0][0], all_headers[0][1:],
-                                       astro_cor_image, args.outputdir,
-                                       'final.fits', root, filt, log_fname)
+                    gtcsetup.write_ccd(all_headers[0][0], updated_headers,
+                                       final_aligned_image, args.outputdir,
+                                       'final_auto.fits', root, filt, log_fname)
 
             times, actions = gtcsetup.save_times(
                 tstart, time(), 'End filter loop',
