@@ -41,7 +41,39 @@ to the end of the text so that the whole string should look like:
     "C:\Users\username\anaconda3\python.exe" "%1" %*"
 This allows Windows to pass all arguments to python.exe.
 
-Now the pipeline can be run from any folder (where the the setup/function files are in the same folder). 
+Now the pipeline can be run from any folder (where the the setup/function files are in the same folder). Below are all available options:
+
+    positional arguments:
+      objectid              Object name as given in the FITS file header. If the object name contains spaces, enclose the name with quotation marks.
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      --workdir WORKDIR     Set the working directory. Default: ./
+      --outputdir OUTPUTDIR
+                            Set the directory to put results in. Default: ./output/
+      --filter FILT         Filter of the images to be reduced. Can be multiple ex: g,i,z Default: r
+      --reduce_obj REDUCE_OBJ
+                            Choose which object to reduce: 0 for science, 1 for standard, 2 for both. Default: 2
+      --doobslog            Create an observing log without going through the full reduction.
+      --dobias              Make the master bias instead of reading it from input file.
+      --bias BIASFILE       Name of the input master bias file. Default: MasterBias
+      --doflat              Make the master flat instead of reading it from input file.
+      --flat FLATFILE       Name of the input master flat file. Default: MasterFlat
+      --maskflat MASKFLAT   If there are stars in your flat that are not removed with the normal method, set this value to true to mask out the stars.
+      --dobpm               Create the master bad pixel mask instead of reading it from the input file.
+      --bpm MASKFILE        Name of the input mask file. Default: MasterBPM
+      --docalib             Apply calibrations (bias, flat, bpm) to science images.
+      --docrmask            Run cosmic ray rejection.
+      --doskysub            Perform sky subtraction.
+      --dostack             Align all images with eachother and median combine them into one image.
+      --dowcs               Improve the astrometric solution.
+      --dointeractive       Manually choose stars to use for performing astrometry.
+      --seeing SEEING       Seeing of the images. Check the header or the QA (quality assurance) file.
+      --logfile LOGFILE     Name of the file which contains all print statements from the pipeline.
+      --dooverwrite DOOVERWRITE
+                            Overwrites any existing files. Default: False
+
+
 You can run the pipeline from any folder using the full path to the data with the following syntax:
 
     OSIRIS_phot_pipeline.py OBJNAME --workdir  "C:\Users\path\to\raw_files" --outputdir "C:\Users\test\path\to\output" --reduce_obj 2 --dobias --doflat --dobpm --docalib --docrmask --doskysub --dostack --dowcs --dointeractive --dooverwrite False --filter r,z
@@ -103,14 +135,16 @@ If the default values don't work for you, some parameters you may want to change
     GAIA stars that are less than this are considered good
     - pad = 200 pixels; pad is used in do_stacking around line 1325. It is the number of rows/columns to add onto each side of 
     the image before aligning and combining (in pixels)
-    -ellipse_lim = 1. is used in get_osiris_obj_cat around line 874; objects with ellipticities less than this will be included 
+    - ellipse_lim = 1. is used in get_osiris_obj_cat around line 874; objects with ellipticities less than this will be included 
     in the OSIRIS detected object catalog/for astrometry
-    -patch_radius = 5 pixels; it is used in plot_images and plot_check_images to set the radius of the circles around the detected stars
+    - patch_radius = 5 pixels; it is used in plot_images and plot_check_images to set the radius of the circles around the detected stars
     - parameters in detect_cosmics
-
+    - tolerance = 15; it is used in auto_astrometry to set how far large of an area the program can look for matching Gaia stars. If
+    your astrometry is good, this can be smaller.
+    
 Note: the remaining varibles are used in do_interactive_astrometry around line 980
 
-    -cross_match_r = patch_radius; as long as you click within the circle of this radius, this should be fine
+    - cross_match_r = patch_radius; as long as you click within the circle of this radius, this should be fine
     - pix_limit = 0 pixels; it determines how close to the edge of the image stars can be; stars at pixel values less than this 
     will not be included in the detected object catalog/for astrometry
     - n_stars_init = 40; n_stars determines how many of the brightest stars (n_stars) will be displayed when doing interactive photometry. 
