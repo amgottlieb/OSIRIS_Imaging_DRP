@@ -98,21 +98,29 @@ def parse_args():
             image.')
 
     add('--dowcs', dest='dowcs', action='store_true',
-        help='Improve the astrometric solution.')
+        help='Improve the astrometric solution. If this is not set, then the \
+            program will not do any astrometric correction, automatic or manual. ')
 
     add('--dointeractive', dest='dointeractive', action='store_true',
-        help='Manually choose stars to use for performing astrometry.')
+        help='Manually choose stars to use for performing astrometry. \
+            If this is not set, then the program will run automatic \
+                astrometry as long as --dowcs is also set.')
 
     add('--seeing', dest='seeing', default=1.0,
         help='Seeing of the images. Check the header or the QA \
-            (quality assurance) file.')
+            (quality assurance) file. Default: 1.0 arcsec')
 
     add('--logfile', dest='logfile', default='log.txt',
         help='Name of the file which contains all print statements from the \
             pipeline.')
 
-    add('--dooverwrite', dest='dooverwrite', default=False,
-        help='Overwrites any existing files. Default: False')
+    add('--clean', dest='dooverwrite', default=False,
+        help='Overwrites all existing folders and files to start from scratch.\
+            Default: False')
+
+    add('--doall', dest='doall', default=False, help=' Do all of the corrections: \
+        dobias, doflat, dobpm, docalib, docrmask, doskysub, dostack, dowcs \
+         (automatic)')
 
     return parser
 
@@ -136,6 +144,19 @@ def setup_args(parser):
         args.outputdir += use_slash
 
     return args, use_slash
+
+
+def change_args(args):
+    """If the user requests --doall, change all reduction steps to True."""
+    args.dobias = True
+    args.doflat = True
+    args.dobpm = True
+    args.docalib = True
+    args.docrmask = True
+    args.doskysub = True
+    args.dostack = True
+    args.dowcs = True
+    return args
 
 
 def sort_files(obj, raw_path, raw_list, use_slash, outputdir, dooverwrite,
@@ -492,43 +513,6 @@ def createMaster(full_flist, frametype, nccd, mbias, gain, rdnoise, outputdir,
 
     # Normalize the flat if creating master flat
     if frametype == 'flat':
-        # if maskflat is True:
-        #     master = []
-        #     for ccd in range(nccd):
-        #         all_masked_images = []
-
-        #         for i, f in enumerate(tmp):
-        #             tmp_fits = [CCDData.read(f, hdu=x+1, unit='adu', memmap=False)
-        #                         for x in range(nccd)]
-        #             tmp_fits[ccd].data /= all_exps[i]
-
-        #             # tmp_fits = [
-        #             #     x.data.divide(all_exps[i]*u.second, handle_meta='first found') for x in tmp_fits_init]
-        #             # sci_final = [[x.divide(all_headers[i][0]['EXPTIME']*u.second,
-        #             #                        propagate_uncertainties=True,
-        #             #                        handle_meta='first_found')
-        #             # for i, x in enumerate(imgs)] for imgs in sky_sub]
-
-        #             mask = make_source_mask(tmp_fits[ccd].data, nsigma=3, npixels=3)
-
-        #             new_hdul = fits.HDUList(fits.PrimaryHDU(header=hdr))
-        #             new_hdul.append(fits.ImageHDU(data=mask.astype(int), header=hdr))
-        #             new_hdul.writeto(outputdir+fname[:-5]+'_mask' +
-        #                              '_ccd'+str(ccd)+'.fits', overwrite=True)
-
-        #             # mask out the stars in the flats before median combining
-        #             # sometimes they're very close to the background value that
-        #             # sigma clipping does not remove them
-        #             masked_img = CCDData(tmp_fits[ccd].data,  # mask=mask,
-        #                                  header=tmp_fits[ccd].header, unit='adu')
-        #             all_masked_images.append(masked_img)
-
-        #         masked_median_img = ccdproc.combine(all_masked_images,
-        #                                             method='median')
-        #         master.append(masked_median_img)
-
-        #     print(master[0].header)
-        #     print(master[1].header)
 
         master = [ccdproc.combine(tmp, hdu=x+1, unit=u.electron, method='median',
                                   sigma_clip=True, sigma_clip_low_thresh=5,

@@ -103,6 +103,8 @@ def main(argv):
     # ############################## SETUP #################################
     # Get input arguments
     args, use_slash = gtcsetup.read_args()
+    if args.doall:
+        args = gtcsetup.change_args(args)
 
     now = datetime.now()  # current date and time
     date_time = now.strftime("%m-%d-%Y_%H-%M-%S")

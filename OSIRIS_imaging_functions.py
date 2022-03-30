@@ -1443,7 +1443,7 @@ def do_stacking(sci_final, all_headers, args, root, filt, astrom_path, log_fname
 
 
 def get_matches(all_gtc_inds, all_gaia_inds):
-    """Test."""
+    """Match Gaia reference stars to detected OSIRIS stars."""
     flat_list = [item for sublist in all_gaia_inds for item in sublist]
     dup_inds = [i for i, x in enumerate(flat_list) if flat_list.count(x) > 1]
     dupes = list(set(np.array(flat_list)[dup_inds]))
@@ -1481,7 +1481,24 @@ def get_matches(all_gtc_inds, all_gaia_inds):
 
 
 def calc_dist(xcen, ycen, radius, xpts, ypts):
-    """Test."""
+    """Determine if the point is within a circle.
+
+    Calculate the distance between the point and the center of the circle.
+
+    Paramters
+    ---------
+    xcen (float) : x coordinate of the center of the circle
+    ycen (float) : y coordinate of the center of the circle
+    radius (float) : radius of the circle/search area
+    xpts (list) : list of x coordinates of stars
+    ypts (list) : list of y coordinates of stars
+
+    Returns
+    -------
+    inds (list) : indices into xpts of stars that fall within the circle
+    distances (list) : distances between the stars and center of the circle
+
+    """
     inds = []
     distances = []
     for i in range(len(xpts)):
@@ -1495,7 +1512,7 @@ def calc_dist(xcen, ycen, radius, xpts, ypts):
 def plot_auto_astrometry(img, w, img_xy, img_radec, ref_img, ref_wcs, ref_xy,
                          ref_radec, all_gtc_inds, all_gaia_inds, bad_gtc_inds,
                          bad_gaia_inds):
-    """Test."""
+    """Plot the OSIRIS image with detected sources and Gaia sources overplotted."""
     colors = ['r', 'g', 'b', 'y', 'cyan', 'k', 'm']*10
     m = np.nanmean(img)
     s = np.nanstd(img)
@@ -1628,28 +1645,6 @@ def do_auto_astrometry(final_aligned_image, full_filt, seeing, astrom_path,
         fig, all_patches = plot_images(img, ref_img, w, ref_wcs, sky, ref_radec,
                                        obj_ra, obj_dec, n_stars, [], 'osiris',
                                        patch_radius=search_radius)
-
-        # m = np.nanmean(img.data)
-        # s = np.nanstd(img.data)
-        # fig = plt.figure()
-        # ax = fig.add_axes([0.1, 0.1, 0.45, 0.8])  # , projection=)
-        # ax.imshow(img.data, origin='lower', interpolation='none',
-        #           vmin=m-s, vmax=m+s, cmap='gray')
-        # # ax.plot(final_x, final_y, 'o', label='image sources')
-        # for i in range(len(final_x)):
-        #     ax.add_patch(patches.Circle((final_x[i], final_y[i]),
-        #                                 radius=cutoff/pix_scale, ec='b',
-        #                                 fc='none', lw=2, alpha=0.8))
-        # ax.plot(ref_x, ref_y, '.', label='gaia sources', c='r')
-        # ax.set_title('before correcting or trimming')
-        # ax.legend()
-        # ax2 = fig.add_axes([0.5, 0.1, 0.45, 0.8], projection=w)
-        # ax2.imshow(img.data, origin='lower', interpolation='none',
-        #            vmin=m-s, vmax=m+s, cmap='gray')
-        # ax2.plot(obj_ra, obj_dec, 'o', c='b', label='image sources',
-        #          transform=ax2.get_transform('fk5'))
-        # ax2.plot(ref_radec.ra, ref_radec.dec, '.', c='r',
-        #          label='gaia sources', transform=ax2.get_transform('fk5'))
 
         ref_radec = ref_radec
         ref_xy = np.array([ref_x, ref_y])
