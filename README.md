@@ -54,7 +54,7 @@ Now the pipeline can be run from any folder (where the the setup/function files 
       --filter FILT         Filter of the images to be reduced. Can be multiple ex: g,i,z Default: r
       --reduce_obj REDUCE_OBJ
                             Choose which object to reduce: 0 for science, 1 for standard, 2 for both. Default: 2
-      --doobslog            Create an observing log without going through the full reduction.
+      --doobslog            Create an observing log without going through the full reduction. 
       --dobias              Make the master bias instead of reading it from input file.
       --bias BIASFILE       Name of the input master bias file. Default: MasterBias
       --doflat              Make the master flat instead of reading it from input file.
@@ -66,12 +66,12 @@ Now the pipeline can be run from any folder (where the the setup/function files 
       --docrmask            Run cosmic ray rejection.
       --doskysub            Perform sky subtraction.
       --dostack             Align all images with eachother and median combine them into one image.
-      --dowcs               Improve the astrometric solution.
-      --dointeractive       Manually choose stars to use for performing astrometry.
-      --seeing SEEING       Seeing of the images. Check the header or the QA (quality assurance) file.
+      --dowcs               Improve the astrometric solution. If this is not set, then the program will not do any astrometric correction, automatic or manual. 
+      --dointeractive       Manually choose stars to use for performing astrometry. If this is not set, then the program will run automatic astrometry as long as --dowcs is also set.
+      --seeing SEEING       Seeing of the images. Check the header or the QA (quality assurance) file. Default: 1.0 arcsec
       --logfile LOGFILE     Name of the file which contains all print statements from the pipeline.
-      --dooverwrite DOOVERWRITE
-                            Overwrites any existing files. Default: False
+      --clean CLEAN         Overwrites all existing folders and files to start from scratch. Default: False
+      --doall               Do all of the corrections (dobias, doflat, dobpm, docalib, docrmask, doskysub, dostack, dowcs (automatic))
 
 
 You can run the pipeline from any folder using the full path to the data with the following syntax:
