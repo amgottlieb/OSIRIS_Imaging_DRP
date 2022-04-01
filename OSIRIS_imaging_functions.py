@@ -1271,7 +1271,7 @@ def crop_padding(img):
         x2 = xinds[final_xind+1]
     else:
         x1 = int(pad/2)
-        x2 = int(xmax-pad/2)
+        x2 = int(xmax-pad)
 
     # Repeat for columns
     ysums = np.nansum(img, axis=1)
@@ -1285,7 +1285,7 @@ def crop_padding(img):
         y1 = yinds[final_yind]
         y2 = yinds[final_yind+1]
     else:
-        y1 = int(pad/2)
+        y1 = int(pad)
         y2 = int(ymax-pad/2)
 
     # x1 = 198
