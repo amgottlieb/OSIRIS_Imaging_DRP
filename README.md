@@ -4,9 +4,16 @@ This is a data reduction pipeline for OSIRIS imaging. It performs bias subtracti
 
 I highly recommend creating a new conda environment and installing all of the packages below.
 
-You can manually create your environment and install the packages with pip: conda create -n gtc_osiris_env python=3.8 
+You can manually create your environment and install the packages with pip: 
+    
+    conda create -n gtc_osiris_env python=3.8 astroalign astropy astroscrappy astroquery ccdproc matplotlib numpy photutils scipy sep
 
-Or you can create it using the .yml file: conda create -f gtc_osiris_environment.yml 
+Or you can create it using the .yml file: 
+
+    conda create -f gtc_osiris_env.yml 
+Then activate the environment:
+    
+    conda activate gtc_osiris_env
 
 Pipeline requirements (install via 'pip install pkgname' unless otherwise noted):
 
