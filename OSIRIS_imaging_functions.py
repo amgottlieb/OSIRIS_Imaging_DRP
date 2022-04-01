@@ -1242,7 +1242,7 @@ def crop_padding(img):
     cropped_img (arr) : same image after removing columns/rows with all zeros
     """
     ymax, xmax = img.shape
-
+    print(img.shape)
     # test_img = copy.deepcopy(img)
     # test_img[np.isnan(test_img)] = -10000
     # plt.figure()
@@ -1253,34 +1253,37 @@ def crop_padding(img):
     # print(img.shape)
 
     # Calculate the sum of all rows
-    xsums = np.nansum(img, axis=0)
+#     xsums = np.nansum(img, axis=0)
     # Get the indices where the sum equals zero
-    xinds = np.where(xsums == 0)[0]
-    print('xinds',xinds)
+#     xinds = np.where(xsums == 0)[0]
+#     print('xinds',xinds)
     # print('xinds', len(xinds), xinds)
     # Subtract the indices from eachother (ex: [1,2,3,5] -> [1,1,2])
-    xdiffs = np.diff(xinds)
-    print('xdiffs',xdiffs)
+#     xdiffs = np.diff(xinds)
+#     print('xdiffs',xdiffs)
     # print('xdiffs', xdiffs)
     # Find where there is a large jump in index (ex: [1,2,3,1000,1001,1002])
-    print(np.where(xdiffs>100))
-    final_xind = np.where(xdiffs > 100)[0][0]
+#     print(np.where(xdiffs>100))
+#     final_xind = np.where(xdiffs > 100)[0][0]
     # print(final_xind)
     # print(xinds[final_xind])
-    # This is the beginning/end of the actual data ex: x1=4, x2=999
-    x1 = xinds[final_xind]
-    x2 = xinds[final_xind+1]
+    # This is the beginning/end of the actual data ex: x1=4, x2=99
+    x1 = int(pad) #xinds[final_xind]
+    x2 = int(xmax-pad) #xinds[final_xind+1]
 
     # Repeat for columns
-    ysums = np.nansum(img, axis=1)
-    yinds = np.where(ysums == 0)[0]
-    # print(yinds)
-    ydiffs = np.diff(yinds)
-    # print(ydiffs)
-    final_yind = np.where(ydiffs > 100)[0][0]
-    # print(final_yind)
-    y1 = yinds[final_yind]
-    y2 = yinds[final_yind+1]
+#     ysums = np.nansum(img, axis=1)
+#     yinds = np.where(ysums == 0)[0]
+#     # print(yinds)
+#     ydiffs = np.diff(yinds)
+#     # print(ydiffs)
+#     final_yind = np.where(ydiffs > 100)[0][0]
+#     # print(final_yind)
+#     y1 = yinds[final_yind]
+#     y2 = yinds[final_yind+1]
+
+    y1 = int(pad) #xinds[final_xind]
+    y2 = int(ymax-pad) #xinds[final_xind+1]
 
     # x1 = 198
     # x2 = 1046
