@@ -6,11 +6,16 @@ I highly recommend creating a new conda environment and installing all of the pa
 
 You can manually create your environment and install the packages with pip: 
     
-    conda create -n gtc_osiris_env python=3.8 astroalign astropy astroscrappy astroquery ccdproc matplotlib numpy photutils scipy sep
+    conda create -n gtc_osiris_env python=3.8
 
 Or you can create it using the .yml file: 
 
     conda create -f gtc_osiris_env.yml 
+    
+If you run into an error with the .yml file, try:
+
+    conda config --append channels conda-forge
+    
 Then activate the environment:
     
     conda activate gtc_osiris_env
