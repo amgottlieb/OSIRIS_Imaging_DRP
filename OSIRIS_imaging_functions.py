@@ -1256,12 +1256,15 @@ def crop_padding(img):
     xsums = np.nansum(img, axis=0)
     # Get the indices where the sum equals zero
     xinds = np.where(xsums == 0)[0]
+    print('xinds',xinds)
     # print('xinds', len(xinds), xinds)
     # Subtract the indices from eachother (ex: [1,2,3,5] -> [1,1,2])
     xdiffs = np.diff(xinds)
+    print('xdiffs',xdiffs)
     # print('xdiffs', xdiffs)
     # Find where there is a large jump in index (ex: [1,2,3,1000,1001,1002])
-    final_xind = np.where(xdiffs > 100)[0]#[0]
+    print(np.where(xdiffs>100))
+    final_xind = np.where(xdiffs > 100)[0][0]
     # print(final_xind)
     # print(xinds[final_xind])
     # This is the beginning/end of the actual data ex: x1=4, x2=999
@@ -1274,7 +1277,7 @@ def crop_padding(img):
     # print(yinds)
     ydiffs = np.diff(yinds)
     # print(ydiffs)
-    final_yind = np.where(ydiffs > 100)[0]#[0]
+    final_yind = np.where(ydiffs > 100)[0][0]
     # print(final_yind)
     y1 = yinds[final_yind]
     y2 = yinds[final_yind+1]
