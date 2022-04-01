@@ -1,8 +1,11 @@
 # OSIRIS_Imaging_DRP
 This is a data reduction pipeline for OSIRIS imaging. It performs bias subtraction, flat division, bad pixel mask, cosmic ray cleaning, sky subtraction, astrometric correction, and stacking.
 
+
 I highly recommend creating a new conda environment and installing all of the packages below.
+
 You can manually create your environment and install the packages with pip: conda create -n gtc_osiris_env python=3.8 
+
 Or you can create it using the .yml file: conda create -f gtc_osiris_environment.yml 
 
 Pipeline requirements (install via 'pip install pkgname' unless otherwise noted):
