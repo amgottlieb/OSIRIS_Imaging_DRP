@@ -77,7 +77,7 @@ def parse_args():
         in your flat that are not removed with the normal method, set this value \
             to true to mask out the stars.')
 
-    add('--dobpm', dest='domask', action='store_true',
+    add('--dobpm', dest='dobpm', action='store_true',
         help='Create the master bad pixel mask instead of reading it from the \
         input file.')
 
