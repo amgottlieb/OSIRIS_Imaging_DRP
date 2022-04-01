@@ -1254,13 +1254,13 @@ def crop_padding(img):
 
     # Calculate the sum of all rows
     xsums = np.nansum(img, axis=0)
-    print('xsums', xsums)
+    # print('xsums', xsums)
     # Get the indices where the sum equals zero
     xinds = np.where(xsums == 0)[0]
-    print('xinds', len(xinds), xinds)
+    # print('xinds', len(xinds), xinds)
     # Subtract the indices from eachother (ex: [1,2,3,5] -> [1,1,2])
     xdiffs = np.diff(xinds)
-    print('xdiffs', xdiffs)
+    # print('xdiffs', xdiffs)
 
     if len(xdiffs) != 0:
         # Find where there is a large jump in index (ex: [1,2,3,1000,1001,1002])
@@ -1364,8 +1364,7 @@ def do_stacking(sci_final, all_headers, args, root, filt, astrom_path, log_fname
                 ######################################
                 ref_imgs = np.pad(ref_imgs_init, padding,
                                   'constant', constant_values=constant_vals)
-                print('first image shapes:', ref_imgs_init.shape)
-                print('first image padded:', ref_imgs.shape)
+
                 aligned_images.append(ref_imgs)
 
                 # MOVE ON TO THE NEXT IMAGE
@@ -1389,10 +1388,6 @@ def do_stacking(sci_final, all_headers, args, root, filt, astrom_path, log_fname
                     propagate_mask=True, detection_sigma=3.0)
 
             img_aligned[footprint] = np.nan
-
-            # plt.figure()
-            # plt.imshow(footprint*1, origin='lower')
-            # plt.show()
 
             # add the footprint image to an array
             footprint_1ccd.append(np.array(footprint*10))
