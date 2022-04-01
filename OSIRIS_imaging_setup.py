@@ -150,7 +150,7 @@ def change_args(args):
     """If the user requests --doall, change all reduction steps to True."""
     args.dobias = True
     args.doflat = True
-    args.dobpm = True
+    args.domask = True
     args.docalib = True
     args.docrmask = True
     args.doskysub = True
