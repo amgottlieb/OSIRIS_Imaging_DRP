@@ -1388,6 +1388,8 @@ def do_stacking(sci_final, all_headers, args, root, filt, astrom_path, log_fname
                     use_image.byteswap().newbyteorder(), ref_imgs,
                     propagate_mask=True, detection_sigma=3.0)
 
+            img_aligned[footprint] = np.nan
+
             # plt.figure()
             # plt.imshow(footprint*1, origin='lower')
             # plt.show()
