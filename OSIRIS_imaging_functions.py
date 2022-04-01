@@ -1253,43 +1253,46 @@ def crop_padding(img):
     # print(img.shape)
 
     # Calculate the sum of all rows
-#     xsums = np.nansum(img, axis=0)
+    xsums = np.nansum(img, axis=0)
     # Get the indices where the sum equals zero
-#     xinds = np.where(xsums == 0)[0]
-#     print('xinds',xinds)
+    xinds = np.where(xsums == 0)[0]
     # print('xinds', len(xinds), xinds)
     # Subtract the indices from eachother (ex: [1,2,3,5] -> [1,1,2])
-#     xdiffs = np.diff(xinds)
-#     print('xdiffs',xdiffs)
+    xdiffs = np.diff(xinds)
     # print('xdiffs', xdiffs)
-    # Find where there is a large jump in index (ex: [1,2,3,1000,1001,1002])
-#     print(np.where(xdiffs>100))
-#     final_xind = np.where(xdiffs > 100)[0][0]
-    # print(final_xind)
-    # print(xinds[final_xind])
-    # This is the beginning/end of the actual data ex: x1=4, x2=99
-    x1 = int(pad) #xinds[final_xind]
-    x2 = int(xmax-pad) #xinds[final_xind+1]
+
+    if len(xdiffs) != 0:
+        # Find where there is a large jump in index (ex: [1,2,3,1000,1001,1002])
+        final_xind = np.where(xdiffs > 100)[0][0]
+        # print(final_xind)
+        # print(xinds[final_xind])
+        # This is the beginning/end of the actual data ex: x1=4, x2=999
+        x1 = xinds[final_xind]
+        x2 = xinds[final_xind+1]
+    else:
+        x1 = int(pad/2)
+        x2 = int(xmax-pad/2)
 
     # Repeat for columns
-#     ysums = np.nansum(img, axis=1)
-#     yinds = np.where(ysums == 0)[0]
-#     # print(yinds)
-#     ydiffs = np.diff(yinds)
-#     # print(ydiffs)
-#     final_yind = np.where(ydiffs > 100)[0][0]
-#     # print(final_yind)
-#     y1 = yinds[final_yind]
-#     y2 = yinds[final_yind+1]
-
-    y1 = int(pad) #xinds[final_xind]
-    y2 = int(ymax-pad) #xinds[final_xind+1]
+    ysums = np.nansum(img, axis=1)
+    yinds = np.where(ysums == 0)[0]
+    # print(yinds)
+    ydiffs = np.diff(yinds)
+    # print(ydiffs)
+    if len(ydiffs) != 0:
+        final_yind = np.where(ydiffs > 100)[0][0]
+        # print(final_yind)
+        y1 = yinds[final_yind]
+        y2 = yinds[final_yind+1]
+    else:
+        y1 = int(pad/2)
+        y2 = int(ymax-pad/2)
 
     # x1 = 198
     # x2 = 1046
     # y1 = 122
     # y2 = 2050
-    # print('x/y', x1, x2, y1, y2)
+    print('x/y', x1, x2, y1, y2)
     # Select the part of the image that contains data and not all zeros
     cropped_img = img[y1:y2, x1:x2]
     # print(cropped_img.shape)
@@ -1419,7 +1422,8 @@ def do_stacking(sci_final, all_headers, args, root, filt, astrom_path, log_fname
         # Append the final aligned image as to be written later
 
         # CCDData(cropped_img, unit='electron'))
-        final_aligned_image.append(CCDData(cropped_img))
+        final_aligned_image.append(CCDData(cropped_img, unit='electron',
+                                           header=all_headers[0][ccd+1]))
 
         footprints.append(np.array(footprint_1ccd))
 
@@ -1445,8 +1449,6 @@ def do_stacking(sci_final, all_headers, args, root, filt, astrom_path, log_fname
                            astrom_path,
                            'pad_aligned'+str(i+1)+'.fits', root, filt, log_fname)
 
-    final_aligned_image[0].header=all_headers[0][1]
-    final_aligned_image[1].header=all_headers[0][2]
     return final_aligned_image
 
 
