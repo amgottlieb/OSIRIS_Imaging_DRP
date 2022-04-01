@@ -1261,7 +1261,7 @@ def crop_padding(img):
     xdiffs = np.diff(xinds)
     # print('xdiffs', xdiffs)
     # Find where there is a large jump in index (ex: [1,2,3,1000,1001,1002])
-    final_xind = np.where(xdiffs > 100)[0][0]
+    final_xind = np.where(xdiffs > 100)[0]#[0]
     # print(final_xind)
     # print(xinds[final_xind])
     # This is the beginning/end of the actual data ex: x1=4, x2=999
@@ -1274,7 +1274,7 @@ def crop_padding(img):
     # print(yinds)
     ydiffs = np.diff(yinds)
     # print(ydiffs)
-    final_yind = np.where(ydiffs > 100)[0][0]
+    final_yind = np.where(ydiffs > 100)[0]#[0]
     # print(final_yind)
     y1 = yinds[final_yind]
     y2 = yinds[final_yind+1]
