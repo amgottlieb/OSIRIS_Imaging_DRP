@@ -3,7 +3,7 @@
 r"""
 Created on Wed Nov  3 11:39:52 2021.
 
-@author: amy
+@author: Amy Gottlieb
 """
 # # Local dependencies
 import OSIRIS_imaging_setup as gtcsetup
