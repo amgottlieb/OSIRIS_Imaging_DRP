@@ -631,12 +631,12 @@ def select_points(img, select_n_stars, color):
     while True:
         pts = []
         while len(pts) < select_n_stars:
-            tellme('Right click inside a '+color+' circle to select at least ' +
+            tellme('Right click OR press w inside a '+color+' circle to select at least ' +
                    str(select_n_stars) +
                    ' stars on the LEFT plot. \n'
                    ' Use the magnifying glass to zoom in.\n'
                    'To remove a selected star, '
-                   'click the back button on your mouse. \n'
+                   'click the back button on your mouse OR press backspace. \n'
                    'Press enter when done.')
 
             pts = np.asarray(plt.ginput(-1, timeout=-1,
@@ -648,22 +648,22 @@ def select_points(img, select_n_stars, color):
                 tellme('Too few points, starting over')
                 time.sleep(1)  # Wait a second
 
-        check_fig = plt.figure()
-        plt.imshow(img, origin='lower', cmap='gray', vmin=np.nanmean(
-            img)-np.nanstd(img), vmax=np.nanmean(img)+np.nanstd(img))
-        plt.plot(np.array(pts).T[0], np.array(pts).T[1], 'o', c='orange')
+        # check_fig = plt.figure()
+        # plt.imshow(img, origin='lower', cmap='gray', vmin=np.nanmean(
+        #     img)-np.nanstd(img), vmax=np.nanmean(img)+np.nanstd(img))
+        # plt.plot(np.array(pts).T[0], np.array(pts).T[1], 'o', c='orange')
 
-        tellme('Happy? Key click for yes, mouse click for no')
+        # tellme('Happy? Key click for yes, mouse click for no')
 
         if plt.waitforbuttonpress():
             break
-            check_fig.close()
+            # check_fig.close()
 
     return pts
 
 
 def select_yes_no(img, select_n_stars):
-    """Set up interactive point selection.
+    """Set up interactive point selection. *NOT USED ANYMORE.
 
     Parameters
     ----------
@@ -1086,8 +1086,7 @@ def do_interactive_astrometry(final_name, fname, full_filt, ccd, astrom_path,
     # select_n_stars = 6
     text = 'You will select '+str(select_n_stars)+' BLACK (OSIRIS) stars first.\n' \
         'Then you will select the corresponding Gaia stars (in blue) in the' \
-        'same order. \n To remove a selected star, click the back button' \
-        ' on your mouse. Click anywhere to begin.'
+        'same order. \n Click anywhere to begin.'
     tellme(text)
     plt.waitforbuttonpress()
     # Points selected by user
@@ -1104,7 +1103,8 @@ def do_interactive_astrometry(final_name, fname, full_filt, ccd, astrom_path,
                                      obj_ra, obj_dec, n_stars, pts, 'gaia')
 
     # Wait for user to select at least n points
-    tellme('You will now select 6 BLUE (gaia) stars in the same order'
+    tellme('You will now select '+str(select_n_stars) +
+           ' BLUE (gaia) stars in the same order'
            ' (pink numbers). Click anywhere to begin.')
     plt.waitforbuttonpress()
     pts2 = select_points(img, select_n_stars, 'BLUE')

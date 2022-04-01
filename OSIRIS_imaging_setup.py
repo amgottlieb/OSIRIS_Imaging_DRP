@@ -114,7 +114,7 @@ def parse_args():
         help='Name of the file which contains all print statements from the \
             pipeline.')
 
-    add('--clean', dest='dooverwrite', default=False,
+    add('--clean', dest='dooverwrite', action='store_true',
         help='Overwrites all existing folders and files to start from scratch.\
             Default: False')
 

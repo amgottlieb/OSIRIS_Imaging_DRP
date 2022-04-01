@@ -4,61 +4,6 @@ r"""
 Created on Wed Nov  3 11:39:52 2021.
 
 @author: amy
-
-Pipeline requirements:
-    ccdproc
-    astropy
-    photutils
-    astroscrappy
-    astroquery
-    scipy
-    numpy
-    matplotlib
-    spalipy
-    *local file- OSIRIS_imaging_setup.py
-
-The pipeline can be run from any folder and is used with the following syntax:
-
-python OSIRIS_phot_pipeline.py
-OBJNAME
---workdir "C:\Users\path\to\raw_files"
---outputdir "C:\Users\test\path\to\output"
---dooverwrite True
---dobias
---doflat
---domask
---docrmask
---doskysub
---dowcs
---dointeractive
---filter g,i,z
-
-OBJNAME is a required input and it is the name of the object that is given in
-the header under the keyword 'OBJECT'. 'workdir' is the full path to the raw
-files and 'outputdir' is the full path to where you want to store the final
-files (it does not have to be in the same folder as the raw files).
-
-Or if the master bias, flat, and bad pixel mask files already exist:
-
-python OSIRIS_phot_pipeline.py
-OBJNAME
---workdir "C:\Users\path\to\raw_files"
---outputdir "C:\Users\path\to\output"
---bias MasterBias
---flat MasterFlat
---mask MasterBPM
---dooverwrite False
---filter g,i,z
-
-Things to update in the future:
-     handle .gz files
-     create configuration file for parameters that can be changed
-         or just make note of them up here
-     do something else if no gaia stars are found
-
-NOTE: If --dooverwrite is True but you don't have --dobias --doflat and --domask,
-all files will be deleted so there will be no master files and the program
-will crash.
 """
 # # Local dependencies
 import OSIRIS_imaging_setup as gtcsetup
@@ -247,8 +192,8 @@ def main(argv):
         msg = 'Step 4: Mask Bad Pixels; filter '+filt
         gtcsetup.print_both(log_fname, msg)
 
-        gtcsetup.print_both(log_fname, '    Domask', args.domask)
-        if args.domask:
+        gtcsetup.print_both(log_fname, '    Dobpm', args.dobpm)
+        if args.dobpm:
             with fits.open(flatname) as fits_open:
                 hdr = fits_open[0].header
             mask = [ccdproc.ccdmask(mflat[k])  # , findbadcolumns=False)
