@@ -3,10 +3,10 @@ This is a data reduction pipeline for OSIRIS imaging. It performs bias subtracti
 
 Pipeline requirements (install via 'pip install pkgname' unless otherwise noted):
 
-    python 3 - If you don't have Python 3 installed already, install it for your os with Anaconda https://www.anaconda.com/products/individual
+    python 3.8 - If you don't have Python 3 installed already, install it for your os with Anaconda https://www.anaconda.com/products/individual
     
     astroalign
-    astropy
+    astropy 
     astroscrappy    conda install -c conda-forge astroscrappy
     astroquery
     ccdproc
@@ -20,6 +20,8 @@ NOTE: These two files come with the download on Github and must be in the same d
 
     *local file- OSIRIS_imaging_gtcsetup.py
     *local file- OSIRIS_imaging_functions.py
+
+It may be helpful to create a new conda environment and install all of the packages above in it: https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html
 
 Store the pipeline and setup/functions files in your favorite folder and add the folder to your PATH and PYTHON_PATH environment. 
 To do this on LINUX/MAC in a terminal:
@@ -82,7 +84,7 @@ OR you can move into the folder where your data is stored and then --workdir and
 
     OSIRIS_phot_pipeline.py OBJNAME -reduce_obj 2 --dobias --doflat --dobpm --docalib --docrmask --doskysub --dostack --dowcs --dointeractive --dooverwrite False --filter r,z
 
-OBJNAME is a required input and it is the name of the object that is given in the header under the keyword 'OBJECT'.
+OBJNAME is a required input and it MUST be the name of the object that is given in the header under the keyword 'OBJECT'.
 'workdir' is the full path to the raw files and 'outputdir' is the full path to where you want to store the final files (it does not have to be in the same folder as the raw files).
 
 Or if the master bias, flat, and bad pixel mask files already exist, give the names of their files with the following syntax (default file names are shown):
