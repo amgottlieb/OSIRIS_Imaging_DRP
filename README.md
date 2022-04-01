@@ -21,7 +21,7 @@ NOTE: These two files come with the download on Github and must be in the same d
     *local file- OSIRIS_imaging_gtcsetup.py
     *local file- OSIRIS_imaging_functions.py
 
-It may be helpful to create a new conda environment and install all of the packages above in it: https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html
+I highly recommend creating a new conda environment and installing all of the packages above in it: https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html
 
 Store the pipeline and setup/functions files in your favorite folder and add the folder to your PATH and PYTHON_PATH environment. 
 To do this on LINUX/MAC in a terminal:
