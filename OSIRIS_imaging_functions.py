@@ -1445,8 +1445,8 @@ def do_stacking(sci_final, all_headers, args, root, filt, astrom_path, log_fname
                            astrom_path,
                            'pad_aligned'+str(i+1)+'.fits', root, filt, log_fname)
 
-    final_alligned_image[0].header=all_headers[0][1]
-    final_alligned_image[1].header=all_headers[0][2]
+    final_aligned_image[0].header=all_headers[0][1]
+    final_aligned_image[1].header=all_headers[0][2]
     return final_aligned_image
 
 
