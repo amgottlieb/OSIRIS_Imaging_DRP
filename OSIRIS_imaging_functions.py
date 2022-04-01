@@ -1419,7 +1419,7 @@ def do_stacking(sci_final, all_headers, args, root, filt, astrom_path, log_fname
         # Append the final aligned image as to be written later
 
         # CCDData(cropped_img, unit='electron'))
-        final_aligned_image.append(cropped_img)
+        final_aligned_image.append(CCDData(cropped_img))
 
         footprints.append(np.array(footprint_1ccd))
 
@@ -1445,6 +1445,8 @@ def do_stacking(sci_final, all_headers, args, root, filt, astrom_path, log_fname
                            astrom_path,
                            'pad_aligned'+str(i+1)+'.fits', root, filt, log_fname)
 
+    final_alligned_image[0].header=all_headers[0][1]
+    final_alligned_image[1].header=all_headers[0][2]
     return final_aligned_image
 
 
