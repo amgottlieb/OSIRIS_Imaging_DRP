@@ -846,7 +846,8 @@ def get_osiris_obj_cat(img, fname, w, pix_limit, log_fname):
     try:
         bkg = sep.Background(img)
     except ValueError:
-        bkg = sep.Background(img.byteswap().newbyteorder())
+        img = img.byteswap().newbyteorder()
+        bkg = sep.Background(img)
     data_sub = img  # -bkg #bkg already subtracted
     objects = sep.extract(data_sub, 1.5, err=bkg.globalrms)
     gtcsetup.print_both(log_fname, 'Found ', len(objects), 'objects in ', fname)
@@ -1363,6 +1364,8 @@ def do_stacking(sci_final, all_headers, args, root, filt, astrom_path, log_fname
                 ######################################
                 ref_imgs = np.pad(ref_imgs_init, padding,
                                   'constant', constant_values=constant_vals)
+                print('first image shapes:', ref_imgs_init.shape)
+                print('first image padded:', ref_imgs.shape)
                 aligned_images.append(ref_imgs)
 
                 # MOVE ON TO THE NEXT IMAGE
@@ -1373,6 +1376,9 @@ def do_stacking(sci_final, all_headers, args, root, filt, astrom_path, log_fname
 
             use_image = np.pad(use_image_init, padding,
                                'constant', constant_values=constant_vals)
+
+            print(use_image_init.shape, use_image.shape)
+
             # constant_values=((np.nan, np.nan), (np.nan, np.nan)))
             # Align the current image with the first reference image
             try:
@@ -1423,7 +1429,8 @@ def do_stacking(sci_final, all_headers, args, root, filt, astrom_path, log_fname
 
         # CCDData(cropped_img, unit='electron'))
         final_aligned_image.append(CCDData(cropped_img, unit='electron',
-                                           header=all_headers[0][ccd+1]))
+                                           header=all_headers[0][ccd+1],
+                                           wcs=WCS(all_headers[0][ccd+1])))
 
         footprints.append(np.array(footprint_1ccd))
 
