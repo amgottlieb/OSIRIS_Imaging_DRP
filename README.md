@@ -1,7 +1,10 @@
 # OSIRIS_Imaging_DRP
 This is a data reduction pipeline for OSIRIS imaging. It performs bias subtraction, flat division, bad pixel mask, cosmic ray cleaning, sky subtraction, astrometric correction, and stacking.
 
-I highly recommend creating a new conda environment and installing all of the packages below in it using the gtc_osiris_environment.yml file: https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html
+I highly recommend creating a new conda environment and installing all of the packages below.
+You can manually create your environment and install the packages with pip: conda create -n gtc_osiris_env python=3.8 
+Or you can create it using the .yml file: conda create -f gtc_osiris_environment.yml 
+
 Pipeline requirements (install via 'pip install pkgname' unless otherwise noted):
 
     python 3.8 - If you don't have Python 3 installed already, install it for your os with Anaconda https://www.anaconda.com/products/individual
@@ -71,7 +74,7 @@ Now the pipeline can be run from any folder (where the the setup/function files 
       --dointeractive       Manually choose stars to use for performing astrometry. If this is not set, then the program will run automatic astrometry as long as --dowcs is also set.
       --seeing SEEING       Seeing of the images. Check the header or the QA (quality assurance) file. Default: 1.0 arcsec
       --logfile LOGFILE     Name of the file which contains all print statements from the pipeline.
-      --clean CLEAN         Overwrites all existing folders and files to start from scratch. Default: False
+      --clean               Overwrites all existing folders and files to start from scratch. Default: False
       --doall               Do all of the corrections (dobias, doflat, dobpm, docalib, docrmask, doskysub, dostack, dowcs (automatic))
 
 The raw data must all be in ONE folder- the pipeline will sort them into their respective folders.
