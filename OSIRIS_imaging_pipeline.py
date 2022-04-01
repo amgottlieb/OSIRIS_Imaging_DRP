@@ -21,9 +21,10 @@ from astropy.io import fits
 from datetime import datetime
 import os
 import warnings
+import matplotlib
 ###
-# from matplotlib import use
-# use('Agg')
+from matplotlib import use
+use('Qt5Agg')
 
 
 __author__ = "A. Gottlieb"
@@ -32,6 +33,7 @@ __created__ = "2021-11-03"
 
 def main(argv):
     """Imaging reduction pipeline."""
+    print(matplotlib.get_backend())
     tstart = time()
     times = []
     actions = []
