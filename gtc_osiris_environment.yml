@@ -1,0 +1,16 @@
+name: gtc-conda
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.8
+  - astropy=4.3.1
+  - astroquery=0.4.4
+  - astroscrappy=1.0.8
+  - ccdproc=2.2.0
+  - matplotlib=3.2.2
+  - numpy=1.18.5
+  - photutils=1.1.0
+  - pip=21.3.1
+  - scipy=1.7.2
+  - sep=1.2.0
