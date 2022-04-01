@@ -118,7 +118,7 @@ def parse_args():
         help='Overwrites all existing folders and files to start from scratch.\
             Default: False')
 
-    add('--doall', dest='doall', default=False, help=' Do all of the corrections: \
+    add('--doall', dest='doall', action='store_true', help=' Do all of the corrections: \
         dobias, doflat, dobpm, docalib, docrmask, doskysub, dostack, dowcs \
          (automatic)')
 
