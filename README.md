@@ -73,7 +73,7 @@ Now the pipeline can be run from any folder (where the the setup/function files 
       --clean CLEAN         Overwrites all existing folders and files to start from scratch. Default: False
       --doall               Do all of the corrections (dobias, doflat, dobpm, docalib, docrmask, doskysub, dostack, dowcs (automatic))
 
-
+The raw data must all be in ONE folder- the pipeline will sort them into their respective folders.
 You can run the pipeline from any folder using the full path to the data with the following syntax:
 
     OSIRIS_phot_pipeline.py OBJNAME --workdir  "C:\Users\path\to\raw_files" --outputdir "C:\Users\test\path\to\output" --reduce_obj 2 --dobias --doflat --dobpm --docalib --docrmask --doskysub --dostack --dowcs --dointeractive --dooverwrite False --filter r,z
