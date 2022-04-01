@@ -1244,6 +1244,7 @@ def crop_padding(img):
     """
     ymax, xmax = img.shape
     print(img.shape)
+
     # test_img = copy.deepcopy(img)
     # test_img[np.isnan(test_img)] = -10000
     # plt.figure()
@@ -1251,16 +1252,15 @@ def crop_padding(img):
     #     img)-np.nanstd(img), vmax=np.nanmean(img)+np.nanstd(img))
     # plt.show()
 
-    # print(img.shape)
-
     # Calculate the sum of all rows
     xsums = np.nansum(img, axis=0)
+    print('xsums', xsums)
     # Get the indices where the sum equals zero
     xinds = np.where(xsums == 0)[0]
-    # print('xinds', len(xinds), xinds)
+    print('xinds', len(xinds), xinds)
     # Subtract the indices from eachother (ex: [1,2,3,5] -> [1,1,2])
     xdiffs = np.diff(xinds)
-    # print('xdiffs', xdiffs)
+    print('xdiffs', xdiffs)
 
     if len(xdiffs) != 0:
         # Find where there is a large jump in index (ex: [1,2,3,1000,1001,1002])
@@ -1271,8 +1271,8 @@ def crop_padding(img):
         x1 = xinds[final_xind]
         x2 = xinds[final_xind+1]
     else:
-        x1 = int(pad/2)
-        x2 = int(xmax-pad)
+        x1 = 0  # int(pad/2)
+        x2 = xmax  # int(xmax-pad)
 
     # Repeat for columns
     ysums = np.nansum(img, axis=1)
@@ -1286,8 +1286,8 @@ def crop_padding(img):
         y1 = yinds[final_yind]
         y2 = yinds[final_yind+1]
     else:
-        y1 = int(pad)
-        y2 = int(ymax-pad/2)
+        y1 = 0  # int(pad)
+        y2 = ymax  # int(ymax-pad/2)
 
     # x1 = 198
     # x2 = 1046
@@ -1376,8 +1376,6 @@ def do_stacking(sci_final, all_headers, args, root, filt, astrom_path, log_fname
 
             use_image = np.pad(use_image_init, padding,
                                'constant', constant_values=constant_vals)
-
-            print(use_image_init.shape, use_image.shape)
 
             # constant_values=((np.nan, np.nan), (np.nan, np.nan)))
             # Align the current image with the first reference image
