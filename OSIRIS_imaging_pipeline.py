@@ -3,7 +3,7 @@
 r"""
 Created on Wed Nov  3 11:39:52 2021.
 
-@author: Amy Gottlieb
+@author: amy
 """
 # # Local dependencies
 import OSIRIS_imaging_setup as gtcsetup
@@ -62,7 +62,8 @@ def main(argv):
 
     log_fname = open(new_logfile, 'a')
     gtcsetup.print_both(log_fname, 'Writing output to file', new_logfile)
-    gtcsetup.print_both(log_fname, 'ARGUMENTS:', argv[1:])
+    gtcsetup.print_both(log_fname, 'INPUT ARGUMENTS:', argv[1:])
+    gtcsetup.print_both(log_fname, 'PIPELINE ARGUMENTS:', args)
 
     # ########################### ADMIN ####################################
     msg = 'Step 1: Administration'
