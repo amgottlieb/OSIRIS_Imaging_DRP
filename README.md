@@ -44,7 +44,7 @@ Store the pipeline and setup/functions files in your favorite folder and add the
 To do this on LINUX/MAC in a terminal:
 
     export PATH=$PATH:/new/path
-    export PYTHON_PATH=$PYTHON_PATH:/new/path
+    export PYTHONPATH=$PYTHONPATH:/new/path
 
 Then make the file an executable:  
     
